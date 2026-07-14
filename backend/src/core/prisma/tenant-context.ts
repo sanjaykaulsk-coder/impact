@@ -11,5 +11,6 @@ export interface TenantContext {
   userId: string;
   roleId: string;
   roleCode: string;
+  roleName: string;
   permissions: string[];
 }

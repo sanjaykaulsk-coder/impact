@@ -13,4 +13,20 @@ export class CampaignsController {
   getBranding(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
     return this.campaigns.getBranding(tenant);
   }
+
+  /**
+   * Drives role-based navigation (spec item 5): the caller's *configured* permission codes for
+   * this campaign, computed by CampaignScopeGuard from Role/RolePermission — never a hard-coded
+   * role-name check on either side of the API boundary (spec §8).
+   */
+  @UseGuards(CampaignScopeGuard)
+  @Get(':campaignId/my-access')
+  getMyAccess(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
+    return {
+      roleId: tenant.roleId,
+      roleCode: tenant.roleCode,
+      roleName: tenant.roleName,
+      permissions: tenant.permissions,
+    };
+  }
 }

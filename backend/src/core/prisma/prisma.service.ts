@@ -52,7 +52,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    */
   async runWithBypass<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.bypass_rls', 'true', true)`;
+      // Explicitly clears app.tenant_id too, not just sets bypass_rls — belt-and-suspenders
+      // alongside the NULLIF(...) fix in the RLS policy itself (see the fix_rls_empty_string_guc
+      // migration for why a stale value can otherwise survive on a reused pooled connection).
+      await tx.$queryRaw`SELECT set_config('app.tenant_id', '', true), set_config('app.bypass_rls', 'true', true)`;
       return fn(tx);
     });
   }

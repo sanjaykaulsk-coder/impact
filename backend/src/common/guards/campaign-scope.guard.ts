@@ -64,6 +64,7 @@ export class CampaignScopeGuard implements CanActivate {
       userId,
       roleId: membership.roleId,
       roleCode: membership.role.code,
+      roleName: membership.role.name,
       permissions,
     };
     return true;

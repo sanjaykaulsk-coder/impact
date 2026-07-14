@@ -1,0 +1,269 @@
+:root {
+  --brand-primary: #1b5e3c;
+  --brand-secondary: #f2a71b;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1a1d1f;
+  --text-muted: #6b7280;
+  --border: #e4e7eb;
+  --danger: #b3261e;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.centered-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.card h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.card p.subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+
+.field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.field input:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 11px 16px;
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.error-banner {
+  background: #fdecea;
+  color: var(--danger);
+  border: 1px solid #f5c6c1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.mock-badge {
+  display: inline-block;
+  background: #fff4d6;
+  color: #8a5b00;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+
+/* -- shell layout -- */
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 260px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.sidebar .brand .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--brand-primary);
+}
+
+.sidebar .brand strong {
+  font-size: 15px;
+}
+
+.nav-section {
+  margin-bottom: 20px;
+}
+
+.nav-section .nav-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 0 0 8px 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.nav-item.active {
+  background: #eef6f1;
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.nav-item.disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.nav-item .soon {
+  font-size: 10px;
+  background: var(--border);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.main {
+  flex: 1;
+  padding: 28px 36px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.topbar select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eef6f1;
+  color: var(--brand-primary);
+}
+
+.branding-banner {
+  border-radius: var(--radius);
+  padding: 28px;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.stat-card .label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.stat-card .value {
+  font-size: 22px;
+  font-weight: 700;
+}
