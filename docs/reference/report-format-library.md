@@ -13,6 +13,20 @@ one against it; until then, this is the working basis for build-plan updates. No
 numbers, names, or GPS coordinates from the source data are reproduced anywhere below — only
 column structure and field-type patterns, with fictional placeholder examples.
 
+**Cross-checked against `docs/reference/Type_of_Campaign_formats.md`** — a PII-masked, sheet-by-
+sheet structural conversion of the same workbook the founder produced separately. That conversion
+confirms every finding below (the four archetypes, the per-SKU column-group pattern, the
+`Qty./Amt./Sc. Card Qty./Sc. Card Value` movement columns) and adds real production data-volume
+evidence worth noting: the Van-based seeding Profile sheet alone has 27,032 real outlet-visit
+rows, and the Mela stalls Profile sheet has 3,289 — this is not a lightly-used spreadsheet format,
+it's Impact's actual day-to-day reporting instrument at meaningful scale, which raises the bar for
+the migration acceptance test in §5 (it needs to hold up at tens of thousands of rows per
+campaign, not a handful). Two additional field-type confirmations from that conversion: Retail
+branding's "Dealer Board Width/Length in Feet/Inches" columns are a real-world example of the
+existing `MEASUREMENT` field type (§4), and Standard Collateral Installation's "Deployment Proof
+image drive link" alongside Latitude/Longitude is a real example of `PHOTO` + `GPS` fields
+appearing together on one record, exactly as spec §17 requires for evidence capture.
+
 ## 1. Four report-format archetypes
 
 Every one of the 21 campaign types in the workbook (Van campaigns, Roadshows, Outreach, Product
