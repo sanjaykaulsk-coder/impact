@@ -67,6 +67,11 @@ export default function PjpPage() {
   const [openPjpDetail, setOpenPjpDetail] = useState<PjpDetail | null>(null);
   const [publishing, setPublishing] = useState(false);
 
+  const [addingManual, setAddingManual] = useState(false);
+  const [manualForm, setManualForm] = useState<PjpRowInput>({});
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualSuccess, setManualSuccess] = useState<string | null>(null);
+
   const canManage = access?.permissions.includes('manage_pjp') ?? false;
   const activeCampaign = campaigns.find((c) => c.campaignId === selectedCampaignId);
 
@@ -160,6 +165,24 @@ export default function PjpPage() {
       setError(err instanceof ApiError ? err.message : 'Could not import PJP');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const submitManualLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCampaignId) return;
+    setManualSaving(true);
+    setError(null);
+    setManualSuccess(null);
+    try {
+      await api.pjp.addManualLocation(selectedCampaignId, manualForm);
+      setManualSuccess(`Added "${manualForm.locationName}" — it's ready to assign right away.`);
+      setManualForm({});
+      loadPjps();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not add that location');
+    } finally {
+      setManualSaving(false);
     }
   };
 
@@ -316,6 +339,115 @@ export default function PjpPage() {
                 </ul>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {canManage && (
+        <div className="panel">
+          <div className="toolbar" style={{ marginBottom: addingManual ? 16 : 0 }}>
+            <h2 style={{ margin: 0 }}>Add a location manually</h2>
+            {!addingManual && (
+              <button className="btn-secondary" onClick={() => setAddingManual(true)}>
+                + Add a location
+              </button>
+            )}
+          </div>
+          <p className="subtitle" style={{ marginTop: addingManual ? 0 : 8 }}>
+            No PJP uploaded yet, or just need one more stop? Add a single location here — it's
+            ready to assign immediately, no CSV needed.
+          </p>
+
+          {addingManual && (
+            <form onSubmit={submitManualLocation}>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Visit date *</label>
+                  <input
+                    required
+                    type="date"
+                    value={manualForm.date ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>State *</label>
+                  <input
+                    required
+                    value={manualForm.stateName ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, stateName: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>District *</label>
+                  <input
+                    required
+                    value={manualForm.districtName ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, districtName: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Tehsil *</label>
+                  <input
+                    required
+                    value={manualForm.tehsilName ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, tehsilName: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Location / outlet *</label>
+                  <input
+                    required
+                    value={manualForm.locationName ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, locationName: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Latitude (optional)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={manualForm.latitude ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, latitude: e.target.value ? Number(e.target.value) : undefined }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Longitude (optional)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={manualForm.longitude ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, longitude: e.target.value ? Number(e.target.value) : undefined }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Contact person (optional)</label>
+                  <input
+                    value={manualForm.contactPerson ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, contactPerson: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Remarks (optional)</label>
+                  <input
+                    value={manualForm.remarks ?? ''}
+                    onChange={(e) => setManualForm((f) => ({ ...f, remarks: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="panel-actions">
+                <button className="btn-primary inline" type="submit" disabled={manualSaving}>
+                  {manualSaving ? 'Adding…' : 'Add location'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setAddingManual(false)}>
+                  Close
+                </button>
+              </div>
+            </form>
+          )}
+
+          {manualSuccess && (
+            <p style={{ marginTop: 16, color: 'var(--brand-primary)', fontSize: 14 }}>{manualSuccess}</p>
           )}
         </div>
       )}

@@ -17,6 +17,7 @@ import type {
   MyAccessResponse,
   MyCampaignSummary,
   PjpDetail,
+  PjpRowInput,
   PjpSummary,
   RequestOtpResponse,
   TokenPair,
@@ -191,6 +192,8 @@ export const api = {
       request<CreatePjpResponse>(`/campaigns/${campaignId}/pjps`, { method: 'POST', body: JSON.stringify(dto) }),
     publish: (campaignId: string, pjpId: string) =>
       request<PjpDetail>(`/campaigns/${campaignId}/pjps/${pjpId}/publish`, { method: 'POST' }),
+    addManualLocation: (campaignId: string, row: PjpRowInput) =>
+      request<PjpDetail>(`/campaigns/${campaignId}/pjps/manual-row`, { method: 'POST', body: JSON.stringify(row) }),
   },
   assignments: {
     list: (campaignId: string) => request<AssignmentSummary[]>(`/campaigns/${campaignId}/assignments`),

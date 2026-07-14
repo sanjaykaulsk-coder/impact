@@ -101,6 +101,63 @@ export class PjpService {
     return { ...pjp, invalidRowDetails: invalid };
   }
 
+  /**
+   * A single, manually-typed location — for campaigns with no PJP file to upload yet, or to add
+   * one more stop without redoing the whole CSV flow. Every manual entry accumulates into one
+   * ongoing PJP per campaign (fileName sentinel below) rather than a CSV-upload's own DRAFT batch,
+   * and is published immediately: unlike a bulk import, there's no separate preview/confirm step
+   * to gate on, since the admin already confirmed this exact row by submitting the form. Published
+   * immediately also means it's assignable right away (AssignmentsService.availableRows only reads
+   * PJPRows whose PJP is PUBLISHED).
+   */
+  private static readonly MANUAL_ENTRIES_FILE_NAME = 'Manually added locations';
+
+  async addManualLocation(tenant: TenantContext, row: PjpRowInputDto, uploadedById: string) {
+    const reasons = this.validateRow(row);
+    if (reasons.length > 0) {
+      throw new BadRequestException(reasons.join('; '));
+    }
+
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      let pjp = await tx.pJP.findFirst({
+        where: { campaignId: tenant.campaignId, fileName: PjpService.MANUAL_ENTRIES_FILE_NAME },
+      });
+      if (!pjp) {
+        pjp = await tx.pJP.create({
+          data: {
+            campaignId: tenant.campaignId,
+            fileName: PjpService.MANUAL_ENTRIES_FILE_NAME,
+            uploadedById,
+            status: 'PUBLISHED',
+            totalRows: 0,
+            invalidRows: 0,
+            publishedAt: new Date(),
+          },
+        });
+      }
+
+      await tx.pJPRow.create({
+        data: {
+          pjpId: pjp.id,
+          campaignId: tenant.campaignId,
+          date: new Date(row.date!),
+          stateName: row.stateName!.trim(),
+          districtName: row.districtName!.trim(),
+          tehsilName: row.tehsilName!.trim(),
+          locationName: row.locationName!.trim(),
+          latitude: row.latitude,
+          longitude: row.longitude,
+          contactPerson: row.contactPerson,
+          remarks: row.remarks,
+          status: 'ACTIVE',
+        },
+      });
+      await tx.pJP.update({ where: { id: pjp.id }, data: { totalRows: { increment: 1 } } });
+
+      return tx.pJP.findUniqueOrThrow({ where: { id: pjp.id }, include: { rows: { orderBy: { date: 'asc' } } } });
+    });
+  }
+
   async publish(tenant: TenantContext, pjpId: string) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const pjp = await tx.pJP.findFirst({ where: { id: pjpId, campaignId: tenant.campaignId } });
