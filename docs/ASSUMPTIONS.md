@@ -1,0 +1,17 @@
+# ASSUMPTIONS.md — running log (founder may override any line)
+
+A-001 Single Impact organisation as root tenant; clients are sub-tenants; no platform white-labelling in v1
+A-002 Languages v1: Hindi + English; architecture supports adding regional languages later
+A-003 PJP files up to ~10,000 rows; larger processed as background jobs
+A-004 Video default cap 60s / 720p unless campaign configures otherwise
+A-005 Offline maps: OSM tiles, per-assignment corridor packages capped ~50MB; full offline maps sequenced post-slice (module 13)
+A-006 Push via FCM; WhatsApp via Business API adapter later, MOCK now
+A-007 Attendance = day start/end check-in with GPS + configurable selfie; no biometrics v1
+A-008 No accounting/invoicing module in MVP; finance visibility is a permission flag only
+A-009 Client users: web portal only in v1, no field app access
+A-010 Admin portal English; field app Hindi-default with English toggle
+A-011 Architecture docs 01 (interpretation), 03 (database design + ERD), 04 (API structure) and 06 (security & tenant isolation) were referenced in Phase A's STATE.md as existing but were not available to the Phase C build session — only 02, 05, 07, 08 were provided. Phase C proceeded using `docs/FIELD_COMMAND_SPEC.md` (§34 entities, §36 security, §38 stack) plus the available architecture docs and CLAUDE.md's locked decisions as the authoritative source, per the process rule to make a practical assumption and continue rather than block. Doc 09 (MVP build sequence) is likewise not available; Phase C built only the foundation with no feature modules per the founder's explicit instruction, so build ordering was not yet needed.
+A-012 The Phase C build container has no hardware virtualization (`/dev/kvm` absent), so no Android emulator can run here. The Flutter app shell is verified via `flutter analyze` / `flutter test` / a debug APK build, not a live emulator session. The founder sees the running app either by installing the built debug APK directly on a real Android phone, or by running the app themselves on their own machine (which does support an emulator) using the one-command README.
+A-013 The Phase C build container has no live URL forwarding for web servers running inside it. The Next.js admin shell is verified headlessly (curl against the API, Playwright screenshots of rendered pages) rather than a clickable live link. The founder sees it live in their own browser by running the one-command `docker compose up` + `pnpm dev` on their own machine per the README.
+A-014 Prisma's query API cannot construct PostGIS geometries directly, so GPS-bearing tables (Location, GPSPoint, RouteTrace) store lat/lng as Decimal columns (source of truth for the app layer) plus a PostGIS `geography(Point,4326)` column kept in sync by a database trigger, so PostGIS distance/containment queries are genuinely usable from day one without forcing raw SQL into every write path.
+A-015 Postgres Row-Level Security is implemented as the third isolation layer (spec risk #7) on every table carrying `client_id`, fail-closed (no `app.tenant_id` session setting = zero rows visible). It is applied automatically by a migration that walks `information_schema` rather than hand-listing ~30 tables, so it can't silently miss a new tenant-scoped table added later.

@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Env
+.env
+.env.local
+*.env.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+backend/generated/
+
+# Flutter / Dart
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/**/ephemeral/
+app/.pub-cache/
+app/pubspec_overrides.yaml
+*.iml
+
+# Docker volumes data (if bind-mounted locally)
+infra/data/
+
+# Test / coverage
+coverage/
+*.lcov
+
+# Misc
+*.tsbuildinfo
+.turbo/
