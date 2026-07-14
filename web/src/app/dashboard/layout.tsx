@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="dot" />
+          <img src="/brand/logo.png" alt="" width={22} height={19} />
           <strong>Field Command</strong>
         </div>
 

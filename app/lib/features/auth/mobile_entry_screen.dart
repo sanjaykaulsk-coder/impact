@@ -60,6 +60,8 @@ class _MobileEntryScreenState extends ConsumerState<MobileEntryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Image.asset('assets/brand/logo.png', height: 48, semanticLabel: ''),
+                    const SizedBox(height: 14),
                     const Text(
                       'Impact Field Command',
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),

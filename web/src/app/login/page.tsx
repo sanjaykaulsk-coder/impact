@@ -54,6 +54,7 @@ export default function LoginPage() {
   return (
     <div className="centered-page">
       <div className="card">
+        <img src="/brand/logo.png" alt="" width={56} height={49} className="brand-mark" />
         <h1>Impact Field Command</h1>
         <p className="subtitle">Admin &amp; supervisor portal</p>
 

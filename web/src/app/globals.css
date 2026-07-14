@@ -51,6 +51,11 @@ button {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+.card .brand-mark {
+  display: block;
+  margin-bottom: 14px;
+}
+
 .card h1 {
   font-size: 20px;
   margin: 0 0 4px;
@@ -154,13 +159,6 @@ button {
   align-items: center;
   gap: 10px;
   margin-bottom: 24px;
-}
-
-.sidebar .brand .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--brand-primary);
 }
 
 .sidebar .brand strong {
