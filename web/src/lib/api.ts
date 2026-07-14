@@ -1,7 +1,11 @@
 import type {
+  AssignmentSummary,
+  AvailableAssignmentUser,
+  AvailablePjpRow,
   CampaignBrandingResponse,
   CampaignSummary,
   ClientSummary,
+  CreateAssignmentRequest,
   CreateCampaignRequest,
   CreateClientRequest,
   CreateFormTemplateRequest,
@@ -16,6 +20,7 @@ import type {
   PjpSummary,
   RequestOtpResponse,
   TokenPair,
+  UpdateAssignmentRequest,
   UpdateCampaignRequest,
   UpdateClientRequest,
   UpsertBrandingRequest,
@@ -186,6 +191,20 @@ export const api = {
       request<CreatePjpResponse>(`/campaigns/${campaignId}/pjps`, { method: 'POST', body: JSON.stringify(dto) }),
     publish: (campaignId: string, pjpId: string) =>
       request<PjpDetail>(`/campaigns/${campaignId}/pjps/${pjpId}/publish`, { method: 'POST' }),
+  },
+  assignments: {
+    list: (campaignId: string) => request<AssignmentSummary[]>(`/campaigns/${campaignId}/assignments`),
+    availableUsers: (campaignId: string) =>
+      request<AvailableAssignmentUser[]>(`/campaigns/${campaignId}/assignments/available-users`),
+    availableRows: (campaignId: string) =>
+      request<AvailablePjpRow[]>(`/campaigns/${campaignId}/assignments/available-rows`),
+    create: (campaignId: string, dto: CreateAssignmentRequest) =>
+      request<AssignmentSummary>(`/campaigns/${campaignId}/assignments`, { method: 'POST', body: JSON.stringify(dto) }),
+    update: (campaignId: string, assignmentId: string, dto: UpdateAssignmentRequest) =>
+      request<AssignmentSummary>(`/campaigns/${campaignId}/assignments/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      }),
   },
 };
 

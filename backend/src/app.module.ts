@@ -5,6 +5,7 @@ import { PrismaModule } from './core/prisma/prisma.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
@@ -15,6 +16,7 @@ import { PjpModule } from './modules/pjp/pjp.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    AssignmentsModule,
     CampaignsModule,
     ClientsModule,
     FormsModule,

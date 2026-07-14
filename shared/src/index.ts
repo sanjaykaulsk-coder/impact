@@ -373,3 +373,47 @@ export interface CreatePjpRequest {
   fileName: string;
   rows: PjpRowInput[];
 }
+
+// -- /campaigns/:campaignId/assignments ---------------------------------------------------------
+export type AssignmentStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+export interface AssignmentSummary {
+  id: string;
+  userId: string;
+  userFullName: string | null;
+  teamId: string | null;
+  team: { id: string; name: string } | null;
+  pjpRowId: string | null;
+  pjpRow: { id: string; date: string; locationName: string; stateName: string; districtName: string } | null;
+  assignmentDate: string;
+  status: AssignmentStatus;
+  createdAt: string;
+}
+
+export interface AvailableAssignmentUser {
+  userId: string;
+  fullName: string;
+  roleName: string;
+}
+
+export interface AvailablePjpRow {
+  id: string;
+  date: string;
+  locationName: string;
+  stateName: string;
+  districtName: string;
+  tehsilName: string;
+}
+
+export interface CreateAssignmentRequest {
+  userId: string;
+  pjpRowId?: string;
+  teamId?: string;
+  assignmentDate: string;
+}
+
+export interface UpdateAssignmentRequest {
+  status?: AssignmentStatus;
+  userId?: string;
+  teamId?: string;
+}

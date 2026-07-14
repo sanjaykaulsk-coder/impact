@@ -18,6 +18,7 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Campaigns', requiredPermission: 'edit', href: '/dashboard/campaigns' },
   { label: 'Forms', requiredPermission: 'manage_forms', href: '/dashboard/forms' },
   { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },
+  { label: 'Assignments', requiredPermission: 'allocate', href: '/dashboard/assignments' },
 ];
 
 export const NAV_SOON_ITEMS: NavItem[] = [
