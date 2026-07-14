@@ -40,6 +40,11 @@ Demo login (mock OTP — see `docs/STATE.md` for the full demo user list): any s
 OTP is always shown on screen (and printed to the backend console) because the OTP provider is a
 clearly-marked MOCK in development. No real SMS is ever sent.
 
+**Try the admin thread yourself:** log in as `9000000001` (Rohan Mehta, Super Admin), then Clients →
+Campaigns → Forms → PJP Upload → Assignments in the sidebar. `samples/sample-pjp.csv` is a ready-
+made file to upload on the PJP Upload screen — four valid rows plus one deliberately invalid row
+(missing state) so you can see the invalid-row detection flag it without failing the whole upload.
+
 ## Flutter field app
 
 Requires the [Flutter SDK](https://docs.flutter.dev/get-started/install) and either an Android

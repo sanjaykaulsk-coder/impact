@@ -1,0 +1,6 @@
+date,state,district,tehsil,location,latitude,longitude,contact,remarks
+2026-08-01,Bihar,Patna,Patna Sadar,Patna Haat Ground,25.594095,85.137566,Ravi Kumar,Morning slot
+2026-08-02,Bihar,Patna,Patna Sadar,Danapur Market,25.633000,85.045200,Suresh Yadav,
+2026-08-03,Bihar,Patna,Patna Sadar,Phulwari Sharif Chowk,25.556700,85.078900,,Afternoon slot
+2026-08-04,Bihar,Nalanda,Bihar Sharif,Bihar Sharif Bazaar,25.198700,85.523900,Neha Singh,
+2026-08-05,,Nalanda,Bihar Sharif,Missing State Example,,,,Deliberately invalid row — for demonstrating invalid-row detection
