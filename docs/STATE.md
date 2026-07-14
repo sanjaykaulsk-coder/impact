@@ -22,7 +22,9 @@ backend/database with scripted real-browser flows (not just unit-level checks), 
   is deliberately still Stage 3.1 scope, not pulled forward — see A-024.
 - **PJP upload** (`backend/src/modules/pjp/`, `web/.../dashboard/pjp/`): CSV upload with automatic
   column-to-field mapping (editable), a client-side validity preview, and server-side per-row
-  validation that skips and reports invalid rows rather than rejecting the whole batch.
+  validation that skips and reports invalid rows rather than rejecting the whole batch. Plus a
+  manual "add a location" form (founder-requested) for campaigns with no PJP file yet, or just one
+  more stop — validated the same way, published immediately, assignable right away.
 - **Assignment** (`backend/src/modules/assignments/`, `web/.../dashboard/assignments/`): links a
   user (and optionally a published PJP row / team) to an assignment date and status, gated by the
   dedicated `allocate` permission; re-validates server-side that the target user actually holds a
