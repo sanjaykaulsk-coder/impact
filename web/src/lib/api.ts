@@ -4,6 +4,9 @@ import type {
   ClientSummary,
   CreateCampaignRequest,
   CreateClientRequest,
+  CreateFormTemplateRequest,
+  FormTemplateDetail,
+  FormTemplateSummary,
   MeResponse,
   MyAccessResponse,
   MyCampaignSummary,
@@ -12,6 +15,7 @@ import type {
   UpdateCampaignRequest,
   UpdateClientRequest,
   UpsertBrandingRequest,
+  UpsertDraftFormRequest,
   VerifyOtpResponse,
 } from '@impact/shared';
 
@@ -150,6 +154,25 @@ export const api = {
       request<CampaignBrandingResponse>(`/campaigns/${campaignId}/branding`, {
         method: 'PUT',
         body: JSON.stringify(dto),
+      }),
+  },
+  forms: {
+    list: (campaignId: string) => request<FormTemplateSummary[]>(`/campaigns/${campaignId}/form-templates`),
+    create: (campaignId: string, dto: CreateFormTemplateRequest) =>
+      request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
+    get: (campaignId: string, templateId: string) =>
+      request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}`),
+    upsertDraft: (campaignId: string, templateId: string, dto: UpsertDraftFormRequest) =>
+      request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      }),
+    publish: (campaignId: string, templateId: string) =>
+      request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}/publish`, {
+        method: 'POST',
       }),
   },
 };

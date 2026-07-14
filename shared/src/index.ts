@@ -180,3 +180,138 @@ export interface UpsertBrandingRequest {
   escalationContactName?: string;
   escalationContactPhone?: string;
 }
+
+// -- /campaigns/:campaignId/form-templates (minimal form builder) ----------------------------
+// Mirrors the schema's full field-type list (backend/prisma/schema.prisma FieldType); the web
+// builder only offers a curated "core" subset as buttons — the rest, and the Campaign SKU
+// Master, are Stage 3.1 per docs/architecture/09-mvp-build-sequence.md.
+export type FieldType =
+  | 'SHORT_TEXT'
+  | 'LONG_TEXT'
+  | 'INTEGER'
+  | 'DECIMAL'
+  | 'CURRENCY'
+  | 'PERCENTAGE'
+  | 'DATE'
+  | 'TIME'
+  | 'DATETIME'
+  | 'DROPDOWN'
+  | 'RADIO'
+  | 'MULTI_SELECT'
+  | 'CHECKBOX'
+  | 'YES_NO'
+  | 'RATING'
+  | 'PHOTO'
+  | 'MULTIPLE_PHOTOS'
+  | 'SHORT_VIDEO'
+  | 'SIGNATURE'
+  | 'DOCUMENT'
+  | 'GPS'
+  | 'AUTO_TIMESTAMP'
+  | 'AUTO_USER'
+  | 'AUTO_ACTIVITY_ID'
+  | 'AUTO_CAMPAIGN_ID'
+  | 'AUTO_LOCATION'
+  | 'SKU_SELECTOR'
+  | 'QUANTITY'
+  | 'MEASUREMENT'
+  | 'SALES_VALUE';
+
+export type ConditionalAction = 'SHOW' | 'HIDE' | 'REQUIRE' | 'OPTIONAL';
+export type FormVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+export interface QuestionOptionResponse {
+  id: string;
+  label: string;
+  value: string;
+  order: number;
+}
+
+export interface FormQuestionResponse {
+  id: string;
+  fieldType: FieldType;
+  label: string;
+  helpText: string | null;
+  order: number;
+  isMandatory: boolean;
+  options: QuestionOptionResponse[];
+}
+
+export interface FormSectionResponse {
+  id: string;
+  title: string;
+  order: number;
+  questions: FormQuestionResponse[];
+}
+
+export interface ConditionalRuleResponse {
+  id: string;
+  triggerQuestionId: string;
+  triggerValueJson: unknown;
+  action: ConditionalAction;
+  targetQuestionId: string;
+}
+
+export interface FormVersionResponse {
+  id: string;
+  version: number;
+  status: FormVersionStatus;
+  publishedAt: string | null;
+  sections: FormSectionResponse[];
+  conditionalRules: ConditionalRuleResponse[];
+}
+
+export interface FormTemplateSummary {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  versions: { id: string; version: number; status: FormVersionStatus }[];
+}
+
+export interface FormTemplateDetail {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  versions: FormVersionResponse[];
+}
+
+export interface CreateFormTemplateRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpsertDraftQuestionOption {
+  label: string;
+  value: string;
+  order: number;
+}
+
+export interface UpsertDraftQuestion {
+  key: string;
+  fieldType: FieldType;
+  label: string;
+  helpText?: string;
+  order: number;
+  isMandatory: boolean;
+  options?: UpsertDraftQuestionOption[];
+}
+
+export interface UpsertDraftSection {
+  title: string;
+  order: number;
+  questions: UpsertDraftQuestion[];
+}
+
+export interface UpsertDraftConditionalRule {
+  triggerQuestionKey: string;
+  triggerValueJson: unknown;
+  action: ConditionalAction;
+  targetQuestionKey: string;
+}
+
+export interface UpsertDraftFormRequest {
+  sections: UpsertDraftSection[];
+  conditionalRules?: UpsertDraftConditionalRule[];
+}

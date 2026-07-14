@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { HealthModule } from './modules/health/health.module';
     AuthModule,
     CampaignsModule,
     ClientsModule,
+    FormsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
