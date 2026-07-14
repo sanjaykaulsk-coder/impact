@@ -1,13 +1,17 @@
 import type {
   CampaignBrandingResponse,
+  CampaignSummary,
   ClientSummary,
+  CreateCampaignRequest,
   CreateClientRequest,
   MeResponse,
   MyAccessResponse,
   MyCampaignSummary,
   RequestOtpResponse,
   TokenPair,
+  UpdateCampaignRequest,
   UpdateClientRequest,
+  UpsertBrandingRequest,
   VerifyOtpResponse,
 } from '@impact/shared';
 
@@ -130,6 +134,23 @@ export const api = {
       request<ClientSummary>('/clients', { method: 'POST', body: JSON.stringify(dto) }),
     update: (id: string, dto: UpdateClientRequest) =>
       request<ClientSummary>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+  },
+  campaignsBuilder: {
+    list: () => request<CampaignSummary[]>('/campaigns'),
+    create: (dto: CreateCampaignRequest) =>
+      request<CampaignSummary>('/campaigns', { method: 'POST', body: JSON.stringify(dto) }),
+    update: (campaignId: string, dto: UpdateCampaignRequest) =>
+      request<CampaignSummary>(`/campaigns/${campaignId}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+    transition: (campaignId: string, toStatus: string) =>
+      request<CampaignSummary>(`/campaigns/${campaignId}/transition`, {
+        method: 'POST',
+        body: JSON.stringify({ toStatus }),
+      }),
+    upsertBranding: (campaignId: string, dto: UpsertBrandingRequest) =>
+      request<CampaignBrandingResponse>(`/campaigns/${campaignId}/branding`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      }),
   },
 };
 

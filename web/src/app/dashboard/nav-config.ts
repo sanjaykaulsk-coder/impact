@@ -13,10 +13,12 @@ export interface LiveNavItem extends NavItem {
   href: string;
 }
 
-export const NAV_LIVE_ITEMS: LiveNavItem[] = [{ label: 'Clients', requiredPermission: 'manage_clients', href: '/dashboard/clients' }];
+export const NAV_LIVE_ITEMS: LiveNavItem[] = [
+  { label: 'Clients', requiredPermission: 'manage_clients', href: '/dashboard/clients' },
+  { label: 'Campaigns', requiredPermission: 'edit', href: '/dashboard/campaigns' },
+];
 
 export const NAV_SOON_ITEMS: NavItem[] = [
-  { label: 'Campaign Builder', requiredPermission: 'edit' },
   { label: 'Form Builder', requiredPermission: 'manage_forms' },
   { label: 'PJP Upload', requiredPermission: 'manage_pjp' },
   { label: 'User Management', requiredPermission: 'manage_users' },

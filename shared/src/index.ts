@@ -135,3 +135,48 @@ export interface UpdateClientRequest {
   brandColorSecondary?: string;
   status?: ClientStatus;
 }
+
+// -- /campaigns (builder essentials) ----------------------------------------------------------
+export interface CampaignSummary {
+  id: string;
+  clientId: string;
+  client: { id: string; name: string; code: string };
+  name: string;
+  code: string;
+  status: CampaignStatus;
+  reportingLanguage: Language;
+  startDate: string;
+  endDate: string | null;
+  deviationToleranceMeters: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCampaignRequest {
+  clientId: string;
+  name: string;
+  code: string;
+  reportingLanguage?: Language;
+  startDate: string;
+  endDate?: string;
+  deviationToleranceMeters?: number;
+}
+
+export interface UpdateCampaignRequest {
+  name?: string;
+  reportingLanguage?: Language;
+  startDate?: string;
+  endDate?: string;
+  deviationToleranceMeters?: number;
+}
+
+export interface UpsertBrandingRequest {
+  primaryColor: string;
+  secondaryColor: string;
+  logoUrl?: string;
+  campaignLogoUrl?: string;
+  homeBannerUrl?: string;
+  instructionsText?: string;
+  escalationContactName?: string;
+  escalationContactPhone?: string;
+}
