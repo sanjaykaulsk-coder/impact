@@ -1,13 +1,15 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 14 July 2026 · **Phase:** C (Working Foundation) — COMPLETE, awaiting founder approval
+**Last updated:** 14 July 2026 (evening) · **Phase:** C (Working Foundation) — COMPLETE, awaiting founder approval
 
 ## Done
 
 **Repo & docs**
 - Monorepo scaffold: `backend/` (NestJS), `web/` (Next.js), `app/` (Flutter), `shared/` (TS API types), `docs/`
-- Phase A docs carried over: `CLAUDE.md`, `README.md`, `docs/FIELD_COMMAND_SPEC.md`, architecture docs 02/05/07/08
-- `docs/ASSUMPTIONS.md`: 22 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
+- Phase A docs carried over: `CLAUDE.md`, `README.md`, `docs/FIELD_COMMAND_SPEC.md`, **full architecture pack 01–09** (01/03/04/06/09 were missing at Phase C's start per A-011 — recovered mid-session from the founder's Phase A zip export and added; the gap logged in A-011 is now closed)
+- `docs/reference/`: `Type_of_Campaign.xlsx` (21 real historical campaign-report sheets — DFR, Profile, Stock Reconciliation, Enquiry formats; contains real contact numbers and client sales figures, kept per the founder's explicit confirmation it's Impact's own proprietary data) and `report-format-library.md` (Claude's distillation of that workbook — see A-023; the founder's own original document of the same name never successfully uploaded after two attempts)
+- `docs/ASSUMPTIONS.md`: 23 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
+- App branding: the founder's logo integrated into both the web admin (favicon, login header, sidebar) and the Flutter app (Android launcher icons, login header) — verified visually on both
 
 **Infrastructure**
 - `docker-compose.yml`: PostgreSQL 16 + PostGIS 3.4, Redis 7, MinIO (with the media bucket auto-created and versioned)
@@ -48,9 +50,10 @@
 - **A-012 / A-021**: this build container has no Android emulator (no hardware virtualization) and cannot build an Android APK (its network policy blocks the Android SDK's own download host) — both are properties of this one container, not of the app. The Flutter app was instead verified as a real compiled Linux-desktop build driven end-to-end against the real backend. See "How to see it yourself" below for what this means for you.
 
 ## Next (after founder approval)
-- Vertical slice per `docs/architecture/09-mvp-build-sequence.md` — not available this session (see A-011); first real feature module should re-derive or request that doc before starting
-- Feature modules in spec-priority order: dynamic form builder, PJP upload, GPS check-in/deviation, milestone reporting, offline sync, supervisor approvals — none built yet, by design (explicit Phase C scope)
+- Vertical slice per `docs/architecture/09-mvp-build-sequence.md` — now complete and updated to fold in the report-format-library's directives (record-level Profile capture with auto-computed DFR aggregates, the new Campaign SKU Master with movement types, and a migration acceptance test gating Stage 3.1)
+- Feature modules in spec-priority order: dynamic form builder (Stage 3.1, now scoped to the four real-world report archetypes), PJP upload, GPS check-in/deviation, milestone reporting, offline sync, supervisor approvals — none built yet, by design (explicit Phase C scope)
 - Founder decisions still pending from Phase A (spec §08): production OTP provider, cloud region, first shadow-pilot campaign
+- If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023
 
 ## Open items for the founder
 1. Approve Phase C, or request changes
