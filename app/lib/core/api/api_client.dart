@@ -1,0 +1,113 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import 'token_store.dart';
+
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+  ApiException(this.statusCode, this.message);
+  @override
+  String toString() => message;
+}
+
+const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+
+String _defaultBaseUrl() {
+  if (_configuredBaseUrl.isNotEmpty) return _configuredBaseUrl;
+  // Android emulators reach the host machine's localhost via the special alias 10.0.2.2, never
+  // "localhost" (that resolves to the emulator itself). Override any of this with
+  // `flutter run --dart-define=API_BASE_URL=http://<lan-ip>:4000/api/v1` for a physical device.
+  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:4000/api/v1';
+  return 'http://localhost:4000/api/v1';
+}
+
+class ApiClient {
+  final TokenStore tokenStore;
+  final String baseUrl;
+  final http.Client _http;
+
+  ApiClient({required this.tokenStore, String? baseUrl, http.Client? client})
+      : baseUrl = baseUrl ?? _defaultBaseUrl(),
+        _http = client ?? http.Client();
+
+  Future<dynamic> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    bool auth = true,
+    bool retry = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (auth) {
+      final token = await tokenStore.accessToken;
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+    }
+
+    http.Response res;
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    switch (method) {
+      case 'GET':
+        res = await _http.get(uri, headers: headers);
+        break;
+      case 'POST':
+        res = await _http.post(uri, headers: headers, body: encodedBody);
+        break;
+      default:
+        throw UnsupportedError('Unsupported method $method');
+    }
+
+    if (res.statusCode == 401 && auth && retry) {
+      final refreshed = await _tryRefresh();
+      if (refreshed) return _request(method, path, body: body, auth: auth, retry: false);
+    }
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (res.body.isEmpty) return null;
+      return jsonDecode(res.body);
+    }
+
+    String message = 'Request failed (${res.statusCode})';
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map && decoded['message'] != null) message = decoded['message'].toString();
+    } catch (_) {
+      // Non-JSON error body — keep the generic message.
+    }
+    throw ApiException(res.statusCode, message);
+  }
+
+  Future<bool> _tryRefresh() async {
+    final refresh = await tokenStore.refreshToken;
+    if (refresh == null) return false;
+    try {
+      final res = await _http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refresh}),
+      );
+      if (res.statusCode != 200) {
+        await tokenStore.clear();
+        return false;
+      }
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      await tokenStore.save(
+        accessToken: decoded['accessToken'] as String,
+        refreshToken: decoded['refreshToken'] as String,
+      );
+      return true;
+    } catch (_) {
+      await tokenStore.clear();
+      return false;
+    }
+  }
+
+  Future<dynamic> get(String path) => _request('GET', path);
+  Future<dynamic> postPublic(String path, Map<String, dynamic> body) =>
+      _request('POST', path, body: body, auth: false);
+  Future<dynamic> post(String path, Map<String, dynamic> body) => _request('POST', path, body: body);
+}
