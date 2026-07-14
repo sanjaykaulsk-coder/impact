@@ -8,6 +8,13 @@ export interface NavItem {
   requiredPermission: string;
 }
 
+// Real, built nav items — linked pages, gated the same way as NAV_SOON_ITEMS.
+export interface LiveNavItem extends NavItem {
+  href: string;
+}
+
+export const NAV_LIVE_ITEMS: LiveNavItem[] = [{ label: 'Clients', requiredPermission: 'manage_clients', href: '/dashboard/clients' }];
+
 export const NAV_SOON_ITEMS: NavItem[] = [
   { label: 'Campaign Builder', requiredPermission: 'edit' },
   { label: 'Form Builder', requiredPermission: 'manage_forms' },

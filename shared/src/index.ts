@@ -102,3 +102,36 @@ export interface CampaignBrandingResponse {
   escalationContactName: string | null;
   escalationContactPhone: string | null;
 }
+
+// -- /clients (platform-level, gated by PlatformPermissionGuard) -----------------------------
+export type ClientStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface ClientSummary {
+  id: string;
+  organisationId: string;
+  name: string;
+  code: string;
+  logoUrl: string | null;
+  brandColorPrimary: string | null;
+  brandColorSecondary: string | null;
+  status: ClientStatus;
+  createdAt: string;
+  updatedAt: string;
+  _count: { campaigns: number };
+}
+
+export interface CreateClientRequest {
+  name: string;
+  code: string;
+  logoUrl?: string;
+  brandColorPrimary?: string;
+  brandColorSecondary?: string;
+}
+
+export interface UpdateClientRequest {
+  name?: string;
+  logoUrl?: string;
+  brandColorPrimary?: string;
+  brandColorSecondary?: string;
+  status?: ClientStatus;
+}

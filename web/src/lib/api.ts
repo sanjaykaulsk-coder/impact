@@ -1,10 +1,13 @@
 import type {
   CampaignBrandingResponse,
+  ClientSummary,
+  CreateClientRequest,
   MeResponse,
   MyAccessResponse,
   MyCampaignSummary,
   RequestOtpResponse,
   TokenPair,
+  UpdateClientRequest,
   VerifyOtpResponse,
 } from '@impact/shared';
 
@@ -120,4 +123,14 @@ export const api = {
   campaignBranding: (campaignId: string) =>
     request<CampaignBrandingResponse>(`/campaigns/${campaignId}/branding`),
   myAccess: (campaignId: string) => request<MyAccessResponse>(`/campaigns/${campaignId}/my-access`),
+  clients: {
+    list: () => request<ClientSummary[]>('/clients'),
+    get: (id: string) => request<ClientSummary>(`/clients/${id}`),
+    create: (dto: CreateClientRequest) =>
+      request<ClientSummary>('/clients', { method: 'POST', body: JSON.stringify(dto) }),
+    update: (id: string, dto: UpdateClientRequest) =>
+      request<ClientSummary>(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+  },
 };
+
+export { ApiError };

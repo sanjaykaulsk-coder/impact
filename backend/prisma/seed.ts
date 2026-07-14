@@ -39,6 +39,7 @@ const PERMISSIONS: { code: string; category: string; description: string }[] = [
   { code: 'manage_users', category: 'admin', description: 'Create/edit/block users' },
   { code: 'manage_forms', category: 'admin', description: 'Create/edit/publish forms' },
   { code: 'manage_pjp', category: 'admin', description: 'Upload/edit PJP and routes' },
+  { code: 'manage_clients', category: 'admin', description: 'Create/edit clients' },
   {
     code: 'platform.cross_tenant_access',
     category: 'platform',

@@ -3,13 +3,15 @@
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { MyAccessResponse } from '@impact/shared';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { NAV_SOON_ITEMS } from './nav-config';
+import { NAV_LIVE_ITEMS, NAV_SOON_ITEMS } from './nav-config';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user, campaigns, selectedCampaignId, selectCampaign, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [access, setAccess] = useState<MyAccessResponse | null>(null);
 
   useEffect(() => {
@@ -49,12 +51,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="nav-section">
           <p className="nav-title">Workspace</p>
-          <div className="nav-item active">Campaign Home</div>
+          <Link href="/dashboard" className={`nav-item ${pathname === '/dashboard' ? 'active' : ''}`}>
+            Campaign Home
+          </Link>
+          {access &&
+            NAV_LIVE_ITEMS.filter((item) => access.permissions.includes(item.requiredPermission)).map((item) => (
+              <Link key={item.href} href={item.href} className={`nav-item ${pathname === item.href ? 'active' : ''}`}>
+                {item.label}
+              </Link>
+            ))}
         </div>
 
         {access && (
           <div className="nav-section">
-            <p className="nav-title">Your access</p>
+            <p className="nav-title">Coming soon</p>
             {NAV_SOON_ITEMS.filter((item) => access.permissions.includes(item.requiredPermission)).map((item) => (
               <div key={item.label} className="nav-item disabled" title="Coming in a later phase — not built yet">
                 {item.label}
