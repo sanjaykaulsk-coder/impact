@@ -5,11 +5,15 @@ import type {
   CreateCampaignRequest,
   CreateClientRequest,
   CreateFormTemplateRequest,
+  CreatePjpRequest,
+  CreatePjpResponse,
   FormTemplateDetail,
   FormTemplateSummary,
   MeResponse,
   MyAccessResponse,
   MyCampaignSummary,
+  PjpDetail,
+  PjpSummary,
   RequestOtpResponse,
   TokenPair,
   UpdateCampaignRequest,
@@ -174,6 +178,14 @@ export const api = {
       request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}/publish`, {
         method: 'POST',
       }),
+  },
+  pjp: {
+    list: (campaignId: string) => request<PjpSummary[]>(`/campaigns/${campaignId}/pjps`),
+    get: (campaignId: string, pjpId: string) => request<PjpDetail>(`/campaigns/${campaignId}/pjps/${pjpId}`),
+    create: (campaignId: string, dto: CreatePjpRequest) =>
+      request<CreatePjpResponse>(`/campaigns/${campaignId}/pjps`, { method: 'POST', body: JSON.stringify(dto) }),
+    publish: (campaignId: string, pjpId: string) =>
+      request<PjpDetail>(`/campaigns/${campaignId}/pjps/${pjpId}/publish`, { method: 'POST' }),
   },
 };
 

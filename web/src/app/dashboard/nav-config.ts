@@ -17,10 +17,10 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Clients', requiredPermission: 'manage_clients', href: '/dashboard/clients' },
   { label: 'Campaigns', requiredPermission: 'edit', href: '/dashboard/campaigns' },
   { label: 'Forms', requiredPermission: 'manage_forms', href: '/dashboard/forms' },
+  { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },
 ];
 
 export const NAV_SOON_ITEMS: NavItem[] = [
-  { label: 'PJP Upload', requiredPermission: 'manage_pjp' },
   { label: 'User Management', requiredPermission: 'manage_users' },
   { label: 'Approvals', requiredPermission: 'approve' },
   { label: 'Reports & Dashboards', requiredPermission: 'view_reports' },

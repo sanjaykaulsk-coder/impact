@@ -315,3 +315,61 @@ export interface UpsertDraftFormRequest {
   sections: UpsertDraftSection[];
   conditionalRules?: UpsertDraftConditionalRule[];
 }
+
+// -- /campaigns/:campaignId/pjps (PJP upload) --------------------------------------------------
+export type PjpStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type PjpRowStatus = 'ACTIVE' | 'CANCELLED' | 'POSTPONED' | 'RESCHEDULED';
+
+export interface PjpRowResponse {
+  id: string;
+  date: string;
+  stateName: string;
+  districtName: string;
+  tehsilName: string;
+  locationName: string;
+  latitude: string | null;
+  longitude: string | null;
+  contactPerson: string | null;
+  remarks: string | null;
+  status: PjpRowStatus;
+}
+
+export interface PjpSummary {
+  id: string;
+  fileName: string;
+  status: PjpStatus;
+  totalRows: number;
+  invalidRows: number;
+  publishedAt: string | null;
+  createdAt: string;
+}
+
+export interface PjpDetail extends PjpSummary {
+  rows: PjpRowResponse[];
+}
+
+export interface PjpInvalidRowDetail {
+  rowIndex: number;
+  reasons: string[];
+}
+
+export interface CreatePjpResponse extends PjpDetail {
+  invalidRowDetails: PjpInvalidRowDetail[];
+}
+
+export interface PjpRowInput {
+  date?: string;
+  stateName?: string;
+  districtName?: string;
+  tehsilName?: string;
+  locationName?: string;
+  latitude?: number;
+  longitude?: number;
+  contactPerson?: string;
+  remarks?: string;
+}
+
+export interface CreatePjpRequest {
+  fileName: string;
+  rows: PjpRowInput[];
+}

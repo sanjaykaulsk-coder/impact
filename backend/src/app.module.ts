@@ -8,6 +8,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
+import { PjpModule } from './modules/pjp/pjp.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { HealthModule } from './modules/health/health.module';
     ClientsModule,
     FormsModule,
     HealthModule,
+    PjpModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
