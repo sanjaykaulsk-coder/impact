@@ -1,6 +1,41 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 14 July 2026 (evening) · **Phase:** C (Working Foundation) — COMPLETE, awaiting founder approval
+**Last updated:** 14 July 2026 (evening) · **Phase:** C — approved. **Stage 2 Session A (admin thread) — COMPLETE, awaiting founder approval to start Session B.**
+
+## Stage 2 Session A — admin thread (this session, after Phase C approval)
+
+Per `docs/architecture/09-mvp-build-sequence.md`: campaign builder essentials → minimal form
+builder → PJP upload → assignment. All four built backend+web, verified end-to-end against a live
+backend/database with scripted real-browser flows (not just unit-level checks), and committed.
+
+- **Client management** (`backend/src/modules/clients/`, `web/.../dashboard/clients/`): create/list/
+  get/update, gated by a new `PlatformPermissionGuard` + dedicated `manage_clients` permission
+  (platform-level, not campaign-scoped — a brand-new client has no campaign yet to scope to).
+- **Campaign builder** (`backend/src/modules/campaigns/`, `web/.../dashboard/campaigns/`): create/
+  list/get/update, the full Draft→…→Archived status-transition chain from spec §9.2 with a
+  separate `approve` permission gate on the review→approved step, and a versioned branding editor.
+  Creating a campaign auto-grants the creator a role on it (see A-026) so they aren't locked out of
+  what they just made.
+- **Minimal form builder** (`backend/src/modules/forms/`, `web/.../dashboard/forms/`): campaign-
+  scoped FormTemplate/FormVersion/FormSection/FormQuestion, 10 core field types, one conditional
+  rule, and the version-freeze-and-clone publish flow spec §10 calls for. The Campaign SKU Master
+  is deliberately still Stage 3.1 scope, not pulled forward — see A-024.
+- **PJP upload** (`backend/src/modules/pjp/`, `web/.../dashboard/pjp/`): CSV upload with automatic
+  column-to-field mapping (editable), a client-side validity preview, and server-side per-row
+  validation that skips and reports invalid rows rather than rejecting the whole batch.
+- **Assignment** (`backend/src/modules/assignments/`, `web/.../dashboard/assignments/`): links a
+  user (and optionally a published PJP row / team) to an assignment date and status, gated by the
+  dedicated `allocate` permission; re-validates server-side that the target user actually holds a
+  role in the campaign.
+
+**Two real bugs found and fixed during this session's own verification** (not shipped and found
+later — caught by driving the actual flows, same discipline as A-018 in Phase C): a browser-version-
+specific regex-escaping issue in an HTML `pattern` attribute, and a nested-Prisma-transaction bug
+where two form-builder endpoints silently returned pre-write state because `findOne()` opened a
+second, connection-isolated transaction from inside an already-open one (A-025 has the full
+post-mortem; checked the rest of the backend for the same shape, found no other instance).
+
+## Phase C — Working Foundation (approved)
 
 ## Done
 
@@ -49,16 +84,17 @@
 - **A-017**: the schema's role-assignment table is always campaign-scoped; there's no clean way yet to express a true platform-wide role. Worked around in seed data; flagged for a real fix in a later module.
 - **A-012 / A-021**: this build container has no Android emulator (no hardware virtualization) and cannot build an Android APK (its network policy blocks the Android SDK's own download host) — both are properties of this one container, not of the app. The Flutter app was instead verified as a real compiled Linux-desktop build driven end-to-end against the real backend. See "How to see it yourself" below for what this means for you.
 
-## Next (after founder approval)
-- Vertical slice per `docs/architecture/09-mvp-build-sequence.md` — now complete and updated to fold in the report-format-library's directives (record-level Profile capture with auto-computed DFR aggregates, the new Campaign SKU Master with movement types, and a migration acceptance test gating Stage 3.1)
-- Feature modules in spec-priority order: dynamic form builder (Stage 3.1, now scoped to the four real-world report archetypes), PJP upload, GPS check-in/deviation, milestone reporting, offline sync, supervisor approvals — none built yet, by design (explicit Phase C scope)
-- Founder decisions still pending from Phase A (spec §08): production OTP provider, cloud region, first shadow-pilot campaign
-- If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023
+## Next (after founder approval of Session A)
+- **Stage 2 Session B (field thread)** per the build sequence: assignment list → activity detail → camera-only opening evidence with GPS/timestamp/overlay → check-in validation → milestone form → offline outbox → sync with visible statuses, on the Flutter app.
+- **Stage 2 Session C (supervisor thread + hardening)**: supervisor inbox → media/GPS review → approve/reject with remarks → airplane-mode end-to-end test → demo of the spec's acceptance scenarios 2 & 3.
+- After the full vertical slice: Stage 3 configuration depth (full 35+ field-type form builder + Campaign SKU Master — see A-024, workflow builder, activity template library, PJP management depth).
+- Founder decisions still pending from Phase A (spec §08): production OTP provider, cloud region, first shadow-pilot campaign.
+- If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023.
 
 ## Open items for the founder
-1. Approve Phase C, or request changes
+1. Approve Session A (admin thread), or request changes, before Session B (field thread) starts
 2. Decide how you'd like to see it running — two options, see below
-3. All work is committed locally on branch `claude/phase-c-foundation-sfqijm`, not yet pushed to GitHub — say the word if you'd like it pushed / a PR opened
+3. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 
 ## How to see it yourself
 

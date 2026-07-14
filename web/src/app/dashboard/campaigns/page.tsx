@@ -83,7 +83,7 @@ const EMPTY_BRANDING_FORM: BrandingFormState = {
 };
 
 export default function CampaignsPage() {
-  const { selectedCampaignId } = useAuth();
+  const { selectedCampaignId, refresh, selectCampaign } = useAuth();
   const [access, setAccess] = useState<MyAccessResponse | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null);
   const [clients, setClients] = useState<ClientSummary[] | null>(null);
@@ -164,7 +164,7 @@ export default function CampaignsPage() {
     setCreateSaving(true);
     setError(null);
     try {
-      await api.campaignsBuilder.create({
+      const created = await api.campaignsBuilder.create({
         clientId: createForm.clientId,
         name: createForm.name,
         code: createForm.code.trim().toUpperCase(),
@@ -176,6 +176,11 @@ export default function CampaignsPage() {
       setCreateForm(EMPTY_CREATE_FORM);
       setCreating(false);
       loadCampaigns();
+      // The creator was just auto-granted a role on this campaign (backend A-026), but the
+      // sidebar's campaign list was fetched at login and has no idea it exists yet — refresh it
+      // and jump straight to the new campaign so it's actually reachable via the switcher.
+      await refresh();
+      selectCampaign(created.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create campaign');
     } finally {

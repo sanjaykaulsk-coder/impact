@@ -16,16 +16,20 @@ Covers MVP modules **1 (mock-OTP login), 2 (client & campaign setup — basic), 
 
 ## Stage 2 — Vertical slice (Prompt 3) · ~3 sessions
 One thread through everything, Van Campaign template:
-- **Session A (admin thread):** campaign builder essentials → minimal form builder (core field types + one conditional rule + versioning skeleton) → PJP upload with mapping/preview/invalid-row detection → assignment. *(Advances modules 2, 4, 5, 6, 7.)*
+- **Session A (admin thread) — COMPLETE, awaiting founder approval:** campaign builder essentials → minimal form builder (core field types + one conditional rule + versioning skeleton) → PJP upload with mapping/preview/invalid-row detection → assignment. *(Advances modules 2, 4, 5, 6, 7.)* Built and verified end-to-end backend+web; see `docs/STATE.md`'s Stage 2 Session A section and A-024–A-028 in `docs/ASSUMPTIONS.md`.
 - **Session B (field thread):** assignment list → activity detail → camera-only opening evidence with GPS/timestamp/overlay → check-in validation → milestone form → offline outbox → sync with visible statuses. *(Advances modules 8–13.)*
 - **Session C (supervisor thread + hardening):** supervisor inbox → media/GPS review → approve/reject with remarks → airplane-mode end-to-end test → demo of acceptance scenarios 2 & 3. *(Advances module 14.)*
 **Founder gate:** you personally run scenario 3 (offline capture → reconnect → synced) on a real phone.
 
-The vertical slice's minimal form builder (Session A) should build its first real form as a
-**Profile-archetype form** (§1.2 of the report-format library) for the Van Campaign template —
-outlet-level capture with a Campaign SKU Master line-item group — rather than a generic
-placeholder form, since that is what the slice needs to prove end-to-end against real report
-shapes from day one.
+Session A's minimal form builder did **not** end up building a Profile-archetype form with a
+Campaign SKU Master line-item group, despite an earlier note here suggesting that. On reflection
+during the build (logged as A-024), that's genuinely Stage 3.1-scope work — S3.1 below already
+owns the Campaign SKU Master entity — and pulling it into a "minimal" Session A builder would have
+meant CampaignSku/SkuMovement CRUD, a movement-aware field type, and DFR rollup logic all in one
+session. Session A instead ships 10 core field types spanning every non-SKU category the schema's
+FieldType enum has (text, numeric, choice, media, location), one conditional rule, and the
+version-freeze-and-clone publish flow — proving the versioning mechanics end-to-end without
+front-loading Stage 3.1's own scope. The Campaign SKU Master remains exactly where S3.1 puts it.
 
 ## Stage 3 — Configuration depth · ~4 sessions
 - **S3.1 · Module 4 full:** Dynamic form builder — all 35+ field types, all controls, conditional logic builder, publishing flow. *(+ module 5 form versioning completed.)* **Now scoped to explicitly include:**
