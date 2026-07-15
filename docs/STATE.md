@@ -94,6 +94,17 @@ case, already partially built into the schema (the `SyncStatus` enum) but never 
    plain Hindi+English message by default; the technical detail is still there, behind a tap, never
    as the primary text. (A-040)
 
+**A regression I introduced while building #7, found and fixed within minutes of the founder
+retesting** (A-041): the new upload-sessions migration accidentally copied the *original, buggy*
+version of the multi-tenant RLS policy instead of the already-fixed one from A-018 — silently
+reverting that earlier fix for the whole database, not just the new table. Login broke completely
+(OTP succeeded, then fetching campaigns crashed and bounced the app back to the login screen).
+Diagnosed straight from the founder's backend log, which pointed at the exact same error as A-018's
+original report. Fixed with a new corrective migration — never edited the already-applied one, since
+that would corrupt Prisma's migration checksum tracking. Logged here in full rather than quietly
+folded into #7, because getting this wrong is exactly the kind of mistake this file exists to make
+visible, not hide.
+
 **Still open, needs the founder's next real-device test to confirm**: the actual root cause of the
 original Wi-Fi connection drops (A-037/A-039) is not fully confirmed — the fixes make it *recover*
 correctly (resumable chunks, bounded timeouts, backoff) rather than claim to have eliminated
@@ -143,7 +154,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - Monorepo scaffold: `backend/` (NestJS), `web/` (Next.js), `app/` (Flutter), `shared/` (TS API types), `docs/`
 - Phase A docs carried over: `CLAUDE.md`, `README.md`, `docs/FIELD_COMMAND_SPEC.md`, **full architecture pack 01–09** (01/03/04/06/09 were missing at Phase C's start per A-011 — recovered mid-session from the founder's Phase A zip export and added; the gap logged in A-011 is now closed)
 - `docs/reference/`: `Type_of_Campaign.xlsx` (21 real historical campaign-report sheets — DFR, Profile, Stock Reconciliation, Enquiry formats; contains real contact numbers and client sales figures, kept per the founder's explicit confirmation it's Impact's own proprietary data), `Type_of_Campaign_formats.md` (the founder's own PII-masked structural conversion of the same workbook, covering all 21 sheets), and `report-format-library.md` (Claude's distillation — see A-023 — cross-checked against the founder's structural conversion, which confirmed every finding and added real production-scale evidence: 27,032 real rows in one sheet alone. The founder's original *directives* document of the same name still hasn't successfully uploaded after three attempts)
-- `docs/ASSUMPTIONS.md`: 40 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
+- `docs/ASSUMPTIONS.md`: 41 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
 - App branding: the founder's logo integrated into both the web admin (favicon, login header, sidebar) and the Flutter app (Android launcher icons, login header) — verified visually on both
 
 **Infrastructure**
