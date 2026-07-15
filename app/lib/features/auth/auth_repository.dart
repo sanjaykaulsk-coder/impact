@@ -32,7 +32,11 @@ class AuthRepository {
       },
     });
     final result = VerifyOtpResponse.fromJson(json as Map<String, dynamic>);
-    await tokenStore.save(accessToken: result.accessToken, refreshToken: result.refreshToken);
+    await tokenStore.save(
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      serverDeviceId: result.device.id,
+    );
     return result;
   }
 

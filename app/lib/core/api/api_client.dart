@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'token_store.dart';
 
@@ -110,4 +111,63 @@ class ApiClient {
   Future<dynamic> postPublic(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body, auth: false);
   Future<dynamic> post(String path, Map<String, dynamic> body) => _request('POST', path, body: body);
+
+  /// Multipart upload — used only for camera evidence photos. Field values are sent as form
+  /// fields alongside the file, matching the backend's UploadMediaDto (multer + class-transformer
+  /// coerce everything from strings, same as any HTML multipart form).
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<int> fileBytes,
+    required String fileFieldName,
+    required String fileName,
+    required String mimeType,
+    required Map<String, String> fields,
+    bool retry = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.MultipartRequest('POST', uri);
+    final token = await tokenStore.accessToken;
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.fields.addAll(fields);
+    final parts = mimeType.split('/');
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        fileFieldName,
+        fileBytes,
+        filename: fileName,
+        contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
+      ),
+    );
+
+    final streamed = await _http.send(request);
+    final res = await http.Response.fromStream(streamed);
+
+    if (res.statusCode == 401 && retry) {
+      final refreshed = await _tryRefresh();
+      if (refreshed) {
+        return postMultipart(
+          path,
+          fileBytes: fileBytes,
+          fileFieldName: fileFieldName,
+          fileName: fileName,
+          mimeType: mimeType,
+          fields: fields,
+          retry: false,
+        );
+      }
+    }
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (res.body.isEmpty) return null;
+      return jsonDecode(res.body);
+    }
+    String message = 'Upload failed (${res.statusCode})';
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map && decoded['message'] != null) message = decoded['message'].toString();
+    } catch (_) {
+      // Non-JSON error body — keep the generic message.
+    }
+    throw ApiException(res.statusCode, message);
+  }
 }

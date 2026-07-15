@@ -8,6 +8,10 @@ import '../../features/auth/device_pending_screen.dart';
 import '../../features/auth/mobile_entry_screen.dart';
 import '../../features/auth/otp_entry_screen.dart';
 import '../../features/campaign_select/campaign_select_screen.dart';
+import '../../features/execution/activity_detail_screen.dart';
+import '../../features/execution/camera_capture_screen.dart';
+import '../../features/execution/execution_models.dart';
+import '../../features/execution/milestone_form_screen.dart';
 import '../../features/home/campaign_home_screen.dart';
 
 /// Bridges Riverpod auth-state changes into GoRouter's redirect re-evaluation.
@@ -49,6 +53,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/device-pending', builder: (context, state) => const DevicePendingScreen()),
       GoRoute(path: '/campaign-select', builder: (context, state) => const CampaignSelectScreen()),
       GoRoute(path: '/home', builder: (context, state) => const CampaignHomeScreen()),
+      GoRoute(
+        path: '/activity/:assignmentId',
+        builder: (context, state) => ActivityDetailScreen(assignmentId: state.pathParameters['assignmentId']!),
+        routes: [
+          GoRoute(
+            path: 'camera',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>;
+              return CameraCaptureScreen(
+                activityInstanceId: extra['activityInstanceId'] as String,
+                campaignId: extra['campaignId'] as String,
+              );
+            },
+          ),
+          GoRoute(
+            path: 'form',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>;
+              return MilestoneFormScreen(
+                activityInstanceId: extra['activityInstanceId'] as String,
+                campaignId: extra['campaignId'] as String,
+                milestone: extra['milestone'] as Milestone,
+              );
+            },
+          ),
+        ],
+      ),
     ],
   );
 });

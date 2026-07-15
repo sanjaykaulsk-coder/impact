@@ -17,17 +17,33 @@ dependencies:
 
   # API client
   http: ^1.2.2
+  http_parser: ^4.1.2
 
   # Token + device-fingerprint persistence (encrypted platform keystore/keychain)
   flutter_secure_storage: ^9.2.2
   device_info_plus: ^11.2.0
   package_info_plus: ^8.1.2
 
+  # Field thread (Stage 2 Session B): camera-only evidence, GPS, offline outbox + background sync
+  # (CLAUDE.md locked decisions: Drift + WorkManager)
+  camera: ^0.11.1
+  geolocator: ^13.0.2
+  permission_handler: ^11.3.1
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.27
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  workmanager: ^0.5.2
+  connectivity_plus: ^6.1.0
+  uuid: ^4.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  drift_dev: ^2.22.1
+  build_runner: ^2.4.13
 
 flutter:
   uses-material-design: true

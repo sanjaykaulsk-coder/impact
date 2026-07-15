@@ -6,10 +6,13 @@ import 'package:field_command/core/api/api_client.dart';
 import 'package:field_command/core/api/device_identity.dart';
 import 'package:field_command/core/api/models.dart';
 import 'package:field_command/core/api/token_store.dart';
+import 'package:field_command/core/providers.dart';
 import 'package:field_command/core/theme/app_theme.dart';
 import 'package:field_command/features/auth/auth_controller.dart';
 import 'package:field_command/features/auth/auth_repository.dart';
 import 'package:field_command/features/auth/auth_state.dart';
+import 'package:field_command/features/execution/execution_models.dart';
+import 'package:field_command/features/execution/execution_repository.dart';
 import 'package:field_command/features/home/campaign_home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,6 +51,15 @@ class _FakeAuthRepository extends AuthRepository {
       escalationContactPhone: '9000099999',
     );
   }
+}
+
+// No assignments queued for this render-only test — CampaignHomeScreen's assignment list simply
+// renders its empty-state text, which isn't asserted on here.
+class _FakeExecutionRepository extends ExecutionRepository {
+  _FakeExecutionRepository() : super(api: ApiClient(tokenStore: TokenStore(_unusedStorage)));
+
+  @override
+  Future<List<MyAssignment>> myAssignments() async => const [];
 }
 
 void main() {
@@ -93,6 +105,7 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(fakeRepo),
           authControllerProvider.overrideWith((ref) => _FixedAuthController(fakeRepo, fixedState)),
+          executionRepositoryProvider.overrideWithValue(_FakeExecutionRepository()),
         ],
         child: MaterialApp(
           theme: buildBaseTheme(),

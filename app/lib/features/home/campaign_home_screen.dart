@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/models.dart';
+import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
+import '../execution/execution_models.dart';
 
 class CampaignHomeScreen extends ConsumerStatefulWidget {
   const CampaignHomeScreen({super.key});
@@ -15,7 +17,16 @@ class CampaignHomeScreen extends ConsumerStatefulWidget {
 
 class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
   Future<CampaignBrandingResponse>? _brandingFuture;
+  Future<List<MyAssignment>>? _assignmentsFuture;
   String? _loadedForCampaignId;
+
+  void _reloadAssignments(String campaignId) {
+    setState(() {
+      _assignmentsFuture = ref.read(executionRepositoryProvider).myAssignments().then(
+            (all) => all.where((a) => a.campaignId == campaignId).toList(),
+          );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +43,9 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
     if (_loadedForCampaignId != campaignId) {
       _loadedForCampaignId = campaignId;
       _brandingFuture = ref.read(authRepositoryProvider).campaignBranding(campaignId);
+      _assignmentsFuture = ref.read(executionRepositoryProvider).myAssignments().then(
+            (all) => all.where((a) => a.campaignId == campaignId).toList(),
+          );
     }
 
     MyCampaignSummary? membership;
@@ -108,30 +122,78 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
                 const SizedBox(height: 16),
                 Text('Today\'s assignments', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.info_outline, color: Colors.grey),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Assignments, PJP and milestone reporting are built in the next phase '
-                          '(this is the Phase C foundation shell — no feature modules yet).',
-                        ),
-                      ),
-                    ],
-                  ),
+                FutureBuilder<List<MyAssignment>>(
+                  future: _assignmentsFuture,
+                  builder: (context, assignmentSnapshot) {
+                    if (assignmentSnapshot.connectionState != ConnectionState.done) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (assignmentSnapshot.hasError) {
+                      return _EmptyAssignmentsNotice(text: 'Could not load assignments: ${assignmentSnapshot.error}');
+                    }
+                    final assignments = assignmentSnapshot.data ?? const [];
+                    if (assignments.isEmpty) {
+                      return const _EmptyAssignmentsNotice(text: 'No assignments for this campaign yet.');
+                    }
+                    return Column(
+                      children: assignments
+                          .map(
+                            (a) => Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: Icon(
+                                  a.status == 'IN_PROGRESS' ? Icons.pending_actions : Icons.location_on_outlined,
+                                  color: primary,
+                                ),
+                                title: Text(a.pjpRow?.locationName ?? 'Assignment'),
+                                subtitle: Text(
+                                  a.pjpRow != null
+                                      ? '${a.pjpRow!.districtName}, ${a.pjpRow!.stateName} — ${a.status}'
+                                      : a.status,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () async {
+                                  await context.push('/activity/${a.id}');
+                                  _reloadAssignments(campaignId);
+                                },
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    );
+                  },
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _EmptyAssignmentsNotice extends StatelessWidget {
+  final String text;
+  const _EmptyAssignmentsNotice({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.grey),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }
