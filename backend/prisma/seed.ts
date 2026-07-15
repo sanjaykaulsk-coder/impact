@@ -6,11 +6,15 @@
  * Idempotent: every create is keyed off a unique code/field, so re-running `prisma:seed` after a
  * schema change updates rather than duplicates.
  *
- * Scope note: per the founder's Phase C instruction ("no feature modules yet"), this seeds only
- * what item 4 of that instruction names — clients, campaigns, geographies, users and roles — plus
- * the campaign branding the web/app shells need to render. It deliberately does not seed forms,
- * workflows, PJPs or execution/governance data; those entity groups exist in the schema (spec
- * §34) but are empty until their feature modules are built.
+ * Scope note: Phase C seeded only clients, campaigns, geographies, users, roles and campaign
+ * branding (no feature modules existed yet). Stage 2 Session A added platform-level clients/
+ * campaigns CRUD (no new seed data needed — the web UI creates those directly). Stage 2 Session B
+ * (the field thread) adds one minimal, hand-seeded workflow for the Bihar Van campaign — one
+ * ActivityType, one CampaignActivity, one Workflow/WorkflowStage/Milestone, one published form,
+ * one PJP + row, one assignment — so the field app has a real end-to-end thread to run without the
+ * founder configuring anything first. This is deliberately NOT the general-purpose workflow/
+ * milestone builder (that's still Stage 3.2, unbuilt); it's a single fixed path, same spirit as
+ * A-024's decision to keep the Session A form builder to core field types only.
  */
 import { PrismaClient, GeographyLevel } from '@prisma/client';
 
@@ -579,6 +583,180 @@ async function main() {
   await grantRole(manoj.id, campaignRaj.id, 'client_campaign_manager');
   const pooja = await seedUser('Pooja Bhatt', '9000000017');
   await grantRole(pooja.id, campaignMaha.id, 'client_auditor');
+
+  // -- Field-thread minimal workflow (Stage 2 Session B) --------------------------------------
+  // One real published form, one workflow with a single milestone requiring a photo + GPS, and
+  // one PJP row + assignment, so the field app has a genuine end-to-end thread to run without the
+  // founder hand-configuring anything first. Deliberately NOT the general-purpose workflow/
+  // milestone builder — that stays Stage 3.2 scope, same spirit as A-024's form-builder decision.
+  const patnaHaatLocationId = geoDeterministicId('LOCATION', 'Patna City Haat Ground');
+
+  const vanActivityType = await prisma.activityType.upsert({
+    where: { code: 'VAN_CAMPAIGN' },
+    update: {},
+    create: { name: 'Van Campaign', code: 'VAN_CAMPAIGN', description: 'Mobile van outreach with outlet visits' },
+  });
+
+  const outletVisitForm = await prisma.formTemplate.upsert({
+    where: { code: 'bihar-van-outlet-visit' },
+    update: {},
+    create: {
+      clientId: shakti.id,
+      campaignId: campaignBihar.id,
+      name: 'Outlet Visit',
+      code: 'bihar-van-outlet-visit',
+      description: 'Milestone form captured at each Van campaign outlet stop',
+    },
+  });
+  const outletVisitVersion = await prisma.formVersion.upsert({
+    where: { formTemplateId_version: { formTemplateId: outletVisitForm.id, version: 1 } },
+    update: {},
+    create: {
+      formTemplateId: outletVisitForm.id,
+      version: 1,
+      status: 'PUBLISHED',
+      createdById: rohan.id,
+      publishedAt: new Date(),
+    },
+  });
+
+  // Form content is static once seeded — only build it the first time this version has no
+  // sections yet, so re-running the seed never duplicates questions.
+  const hasSections = await prisma.formSection.findFirst({ where: { formVersionId: outletVisitVersion.id } });
+  if (!hasSections) {
+    const section = await prisma.formSection.create({
+      data: { formVersionId: outletVisitVersion.id, title: 'Outlet Details', order: 0 },
+    });
+    await prisma.formQuestion.create({
+      data: { formSectionId: section.id, fieldType: 'SHORT_TEXT', label: 'Outlet name', order: 0, isMandatory: true },
+    });
+    const conducted = await prisma.formQuestion.create({
+      data: {
+        formSectionId: section.id,
+        fieldType: 'YES_NO',
+        label: 'Was the activity conducted?',
+        order: 1,
+        isMandatory: true,
+      },
+    });
+    const reasonNotConducted = await prisma.formQuestion.create({
+      data: {
+        formSectionId: section.id,
+        fieldType: 'LONG_TEXT',
+        label: 'Reason not conducted',
+        order: 2,
+        isMandatory: false,
+      },
+    });
+    const outletType = await prisma.formQuestion.create({
+      data: { formSectionId: section.id, fieldType: 'DROPDOWN', label: 'Outlet type', order: 3, isMandatory: true },
+    });
+    await prisma.questionOption.createMany({
+      data: [
+        { formQuestionId: outletType.id, label: 'Kirana', value: 'kirana', order: 0 },
+        { formQuestionId: outletType.id, label: 'Chemist', value: 'chemist', order: 1 },
+        { formQuestionId: outletType.id, label: 'General Store', value: 'general_store', order: 2 },
+      ],
+    });
+    await prisma.conditionalRule.create({
+      data: {
+        formVersionId: outletVisitVersion.id,
+        triggerQuestionId: conducted.id,
+        triggerValueJson: false,
+        action: 'SHOW',
+        targetQuestionId: reasonNotConducted.id,
+      },
+    });
+  }
+
+  const vanWorkflow = await prisma.workflow.upsert({
+    where: { id: geoDeterministicId('WORKFLOW', 'Bihar Van Workflow') },
+    update: {},
+    create: {
+      id: geoDeterministicId('WORKFLOW', 'Bihar Van Workflow'),
+      campaignId: campaignBihar.id,
+      name: 'Bihar Van Outlet Visit Workflow',
+    },
+  });
+  const vanStage = await prisma.workflowStage.upsert({
+    where: { workflowId_order: { workflowId: vanWorkflow.id, order: 0 } },
+    update: {},
+    create: { workflowId: vanWorkflow.id, name: 'Outlet Visit', order: 0, allowIncompletePreparation: true },
+  });
+  await prisma.milestone.upsert({
+    where: { workflowStageId_order: { workflowStageId: vanStage.id, order: 0 } },
+    update: {},
+    create: {
+      workflowStageId: vanStage.id,
+      name: 'Opening evidence + outlet form',
+      order: 0,
+      formVersionId: outletVisitVersion.id,
+      mandatoryPhotoCount: 1,
+      mandatoryGps: true,
+      mandatorySignature: false,
+    },
+  });
+
+  await prisma.campaignActivity.upsert({
+    where: { id: geoDeterministicId('CAMPAIGN_ACTIVITY', 'Bihar Van Outlet Visit') },
+    update: {},
+    create: {
+      id: geoDeterministicId('CAMPAIGN_ACTIVITY', 'Bihar Van Outlet Visit'),
+      campaignId: campaignBihar.id,
+      activityTypeId: vanActivityType.id,
+      name: 'Bihar Van Outlet Visit',
+      configJson: { workflowId: vanWorkflow.id },
+    },
+  });
+
+  // A published PJP with one row today's field worker can actually pick up, plus the assignment
+  // linking Rahul Kumar (Promoter, seeded above) to it.
+  const vanPjp = await prisma.pJP.upsert({
+    where: { id: geoDeterministicId('PJP', 'Bihar Van Seed Route') },
+    update: {},
+    create: {
+      id: geoDeterministicId('PJP', 'Bihar Van Seed Route'),
+      campaignId: campaignBihar.id,
+      fileName: 'Seed data — Bihar Van route',
+      uploadedById: rohan.id,
+      status: 'PUBLISHED',
+      totalRows: 1,
+      invalidRows: 0,
+      publishedAt: new Date(),
+    },
+  });
+  const vanPjpRow = await prisma.pJPRow.upsert({
+    where: { id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Patna Haat Ground') },
+    update: {},
+    create: {
+      id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Patna Haat Ground'),
+      pjpId: vanPjp.id,
+      campaignId: campaignBihar.id,
+      date: new Date(),
+      stateName: 'Bihar',
+      districtName: 'Patna',
+      tehsilName: 'Patna Sadar',
+      locationName: 'Patna City Haat Ground',
+      locationId: patnaHaatLocationId,
+      latitude: 25.594095,
+      longitude: 85.137566,
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.userAssignment.upsert({
+    where: { id: geoDeterministicId('ASSIGNMENT', 'Rahul Bihar Van Seed') },
+    update: {},
+    create: {
+      id: geoDeterministicId('ASSIGNMENT', 'Rahul Bihar Van Seed'),
+      campaignId: campaignBihar.id,
+      clientId: shakti.id,
+      userId: rahul.id,
+      pjpRowId: vanPjpRow.id,
+      assignedById: rohan.id,
+      assignmentDate: new Date(),
+      status: 'ASSIGNED',
+    },
+  });
 
   console.log('Seed complete.');
   console.log('');

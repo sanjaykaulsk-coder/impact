@@ -34,4 +34,34 @@ export class MeController {
   getMyCampaigns(@CurrentUser() user: AuthenticatedUser) {
     return this.campaigns.getMyCampaigns(user.id);
   }
+
+  /**
+   * "Today's assignments" (spec §16's field-app flow) spans every campaign the caller holds a
+   * role in, so — like getMyCampaigns — this can't be a single CampaignScopeGuard-gated route.
+   * Safe bypass: hard-filtered to `userId = caller's own id`, never client-controlled.
+   */
+  @Get('assignments')
+  getMyAssignments(@CurrentUser() user: AuthenticatedUser) {
+    return this.prisma.runWithBypass((tx) =>
+      tx.userAssignment.findMany({
+        where: { userId: user.id, status: { in: ['ASSIGNED', 'IN_PROGRESS'] } },
+        orderBy: { assignmentDate: 'asc' },
+        include: {
+          campaign: { select: { id: true, name: true, code: true } },
+          pjpRow: {
+            select: {
+              id: true,
+              date: true,
+              locationName: true,
+              stateName: true,
+              districtName: true,
+              tehsilName: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
+        },
+      }),
+    );
+  }
 }
