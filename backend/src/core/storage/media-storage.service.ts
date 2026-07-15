@@ -71,7 +71,16 @@ export class MediaStorageService implements OnModuleInit {
   }
 
   private async renderWatermark(buffer: Buffer, w: WatermarkFields): Promise<Buffer> {
-    const image = sharp(buffer).rotate(); // .rotate() with no args auto-orients from EXIF
+    // .metadata() reports the file's *un-rotated* pixel dimensions even when a later .rotate()
+    // is queued on the pipeline — phone photos are routinely tagged with an EXIF orientation
+    // (portrait shots from a landscape sensor) rather than physically rotated, so metadata().width
+    // can be the pre-rotation value while .rotate()'s actual output is transposed. Sizing the
+    // watermark SVG off that stale width broke sharp's composite() with "Image to composite must
+    // have same dimensions or smaller" on real phone photos (never seen on desktop test images,
+    // which typically have no EXIF orientation tag at all). Fixed by materializing the rotated
+    // image into a buffer first, then reading dimensions from *that* — genuinely post-rotation.
+    const rotated = await sharp(buffer).rotate().toBuffer();
+    const image = sharp(rotated);
     const meta = await image.metadata();
     const width = meta.width ?? 1080;
     const stripHeight = Math.max(90, Math.round(width * 0.12));
