@@ -26,6 +26,16 @@ String _defaultBaseUrl() {
   return 'http://localhost:4000/api/v1';
 }
 
+// Without this, a stalled connection (a common real-world Wi-Fi symptom — the request never
+// gets a response and never gets reset either) leaves a request hanging forever with no way for
+// the UI to know it should give up and let the user retry. Generous because a real phone photo
+// over real Wi-Fi can legitimately take a while, but bounded so "stuck" is always eventually
+// distinguishable from "still working."
+const _requestTimeout = Duration(seconds: 30);
+// Photo uploads are larger and slower than a plain JSON request, so they get more room before
+// being declared stuck.
+const _uploadTimeout = Duration(seconds: 60);
+
 class ApiClient {
   final TokenStore tokenStore;
   final String baseUrl;
@@ -53,10 +63,10 @@ class ApiClient {
     final encodedBody = body != null ? jsonEncode(body) : null;
     switch (method) {
       case 'GET':
-        res = await _http.get(uri, headers: headers);
+        res = await _http.get(uri, headers: headers).timeout(_requestTimeout);
         break;
       case 'POST':
-        res = await _http.post(uri, headers: headers, body: encodedBody);
+        res = await _http.post(uri, headers: headers, body: encodedBody).timeout(_requestTimeout);
         break;
       default:
         throw UnsupportedError('Unsupported method $method');
@@ -86,11 +96,13 @@ class ApiClient {
     final refresh = await tokenStore.refreshToken;
     if (refresh == null) return false;
     try {
-      final res = await _http.post(
-        Uri.parse('$baseUrl/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refreshToken': refresh}),
-      );
+      final res = await _http
+          .post(
+            Uri.parse('$baseUrl/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refreshToken': refresh}),
+          )
+          .timeout(_requestTimeout);
       if (res.statusCode != 200) {
         await tokenStore.clear();
         return false;
@@ -139,8 +151,8 @@ class ApiClient {
       ),
     );
 
-    final streamed = await _http.send(request);
-    final res = await http.Response.fromStream(streamed);
+    final streamed = await _http.send(request).timeout(_uploadTimeout);
+    final res = await http.Response.fromStream(streamed).timeout(_uploadTimeout);
 
     if (res.statusCode == 401 && retry) {
       final refreshed = await _tryRefresh();

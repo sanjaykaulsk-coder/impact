@@ -75,7 +75,11 @@ class OutboxDatabase extends _$OutboxDatabase {
   }
 
   Future<void> markSyncing(String id) => (update(outboxItems)..where((t) => t.id.equals(id))).write(
-        OutboxItemsCompanion(status: const Value('syncing'), updatedAt: Value(DateTime.now())),
+        OutboxItemsCompanion(
+          status: const Value('syncing'),
+          errorMessage: const Value(null),
+          updatedAt: Value(DateTime.now()),
+        ),
       );
 
   Future<void> markSynced(String id) => (update(outboxItems)..where((t) => t.id.equals(id))).write(
