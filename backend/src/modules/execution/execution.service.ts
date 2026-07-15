@@ -170,29 +170,37 @@ export class ExecutionService {
     file: Express.Multer.File,
     dto: UploadMediaDto,
   ) {
-    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+    // The MinIO upload + watermark rendering below is genuinely slow (real phone photos over a
+    // real network, plus image compositing) and must never run inside a Prisma interactive
+    // transaction — those default to a 5-second timeout, easily exceeded by a real capture, which
+    // surfaced as an "Internal Server Error" on real-device testing. So this reads what it needs
+    // in one short transaction, does the slow work with no transaction open, then writes the
+    // result in a second short transaction — never holding a DB transaction open across I/O.
+    const { activity, uploaderFullName } = await this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const activity = await tx.activityInstance.findUniqueOrThrow({
         where: { id: activityInstanceId },
         include: { pjpRow: true },
       });
       this.assertOwnership(activity, userId);
-
       const uploader = await tx.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+      return { activity, uploaderFullName: uploader?.fullName ?? 'Field user' };
+    });
 
-      const stored = await this.media.uploadEvidencePhoto({
-        buffer: file.buffer,
-        mimeType: file.mimetype,
-        clientId: tenant.clientId,
-        campaignId: tenant.campaignId,
-        watermark: {
-          locationName: activity.pjpRow?.locationName ?? 'Field location',
-          capturedAt: new Date(dto.capturedAt),
-          latitude: dto.latitude,
-          longitude: dto.longitude,
-          userFullName: uploader?.fullName ?? 'Field user',
-        },
-      });
+    const stored = await this.media.uploadEvidencePhoto({
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      clientId: tenant.clientId,
+      campaignId: tenant.campaignId,
+      watermark: {
+        locationName: activity.pjpRow?.locationName ?? 'Field location',
+        capturedAt: new Date(dto.capturedAt),
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        userFullName: uploaderFullName,
+      },
+    });
 
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       // Duplicate-photo detection (spec §17): the exact same bytes already uploaded for this
       // activity is returned as-is rather than stored (and billed for storage) twice.
       const existing = await tx.media.findFirst({

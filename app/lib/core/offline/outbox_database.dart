@@ -85,4 +85,16 @@ class OutboxDatabase extends _$OutboxDatabase {
   Future<void> markFailed(String id, String error) => (update(outboxItems)..where((t) => t.id.equals(id))).write(
         OutboxItemsCompanion(status: const Value('failed'), errorMessage: Value(error), updatedAt: Value(DateTime.now())),
       );
+
+  /// Discards a failed item so its slot (e.g. a photo requirement) can be filled again — used
+  /// when the queued attempt itself was the problem (a bad capture) rather than a transient sync
+  /// failure that a plain retry would fix.
+  Future<void> discard(String id) async {
+    final row = await (select(outboxItems)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (row?.filePath != null) {
+      final file = File(row!.filePath!);
+      if (await file.exists()) await file.delete();
+    }
+    await (delete(outboxItems)..where((t) => t.id.equals(id))).go();
+  }
 }

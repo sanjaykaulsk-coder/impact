@@ -48,7 +48,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
-      final controller = CameraController(back, ResolutionPreset.high, enableAudio: false);
+      // .medium (~720p) rather than .high: plenty sharp for evidence review, noticeably faster to
+      // capture and upload on real hardware — .high was visibly laggy on real-device testing and
+      // made the upload slow enough to matter.
+      final controller = CameraController(back, ResolutionPreset.medium, enableAudio: false);
       await controller.initialize();
       if (!mounted) return;
       setState(() => _controller = controller);

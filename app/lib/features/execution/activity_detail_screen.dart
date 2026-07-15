@@ -137,10 +137,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       stream: outboxDb.watchForActivity(bundle.activity.id),
       builder: (context, snapshot) {
         final outbox = snapshot.data ?? const <OutboxItem>[];
-        final hasCheckIn = bundle.hasCheckIn || outbox.any((i) => i.type == 'checkIn');
-        final hasCheckOut = bundle.hasCheckOut || outbox.any((i) => i.type == 'checkOut');
-        final photoCount = bundle.media.length + outbox.where((i) => i.type == 'media').length;
-        final hasFormResponse = bundle.hasFormResponse || outbox.any((i) => i.type == 'milestoneResponse');
+        // A 'failed' outbox item hasn't actually reached the server — counting it here would let
+        // check-out proceed on a photo that doesn't exist yet server-side, which the backend's
+        // own check-out validation would then reject anyway (a confusing second failure for what
+        // looks, from this screen, like an already-satisfied requirement).
+        final hasCheckIn = bundle.hasCheckIn || outbox.any((i) => i.type == 'checkIn' && i.status != 'failed');
+        final hasCheckOut = bundle.hasCheckOut || outbox.any((i) => i.type == 'checkOut' && i.status != 'failed');
+        final photoCount = bundle.media.length + outbox.where((i) => i.type == 'media' && i.status != 'failed').length;
+        final hasFormResponse =
+            bundle.hasFormResponse || outbox.any((i) => i.type == 'milestoneResponse' && i.status != 'failed');
 
         final requiredPhotos = milestone?.mandatoryPhotoCount ?? 0;
         final needsGps = milestone?.mandatoryGps ?? false;
@@ -239,7 +244,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 const SizedBox(height: 24),
                 Text('Sync status', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                ...outbox.map((item) => _OutboxStatusTile(item: item)),
+                ...outbox.map((item) => _OutboxStatusTile(
+                      item: item,
+                      onRetake: item.type == 'media' && item.status == 'failed'
+                          ? () async {
+                              await ref.read(outboxDatabaseProvider).discard(item.id);
+                              if (!mounted) return;
+                              await this.context.push(
+                                '/activity/${widget.assignmentId}/camera',
+                                extra: {'activityInstanceId': bundle.activity.id, 'campaignId': _campaignId},
+                              );
+                              await _load();
+                            }
+                          : null,
+                    )),
                 TextButton.icon(
                   onPressed: _syncNow,
                   icon: const Icon(Icons.sync),
@@ -274,7 +292,8 @@ class _RequirementTile extends StatelessWidget {
 
 class _OutboxStatusTile extends StatelessWidget {
   final OutboxItem item;
-  const _OutboxStatusTile({required this.item});
+  final VoidCallback? onRetake;
+  const _OutboxStatusTile({required this.item, this.onRetake});
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +308,9 @@ class _OutboxStatusTile extends StatelessWidget {
       leading: Icon(Icons.circle, size: 12, color: color),
       title: Text(_labelFor(item.type)),
       subtitle: item.errorMessage != null ? Text(item.errorMessage!, style: const TextStyle(color: Colors.red)) : null,
-      trailing: Text(item.status),
+      trailing: onRetake != null
+          ? TextButton(onPressed: onRetake, child: const Text('Retake'))
+          : Text(item.status),
     );
   }
 
