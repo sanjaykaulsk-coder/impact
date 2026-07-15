@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/location/get_current_position.dart';
 import '../../core/offline/outbox_database.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
@@ -46,22 +46,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
-  Future<Position> _getPosition() async {
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      throw Exception('Location permission is required to check in');
-    }
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      throw Exception('Turn on location services to check in');
-    }
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-  }
-
   Future<void> _syncNow() async {
     try {
       await ref.read(syncServiceProvider).syncPending();
@@ -74,7 +58,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Future<void> _checkIn() async {
     setState(() => _actionInProgress = true);
     try {
-      final position = await _getPosition();
+      final position = await getCurrentPositionOrThrow();
       await ref.read(outboxDatabaseProvider).enqueue(
         type: 'checkIn',
         campaignId: _campaignId,
@@ -97,7 +81,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   Future<void> _checkOut() async {
     setState(() => _actionInProgress = true);
     try {
-      final position = await _getPosition();
+      final position = await getCurrentPositionOrThrow();
       await ref.read(outboxDatabaseProvider).enqueue(
         type: 'checkOut',
         campaignId: _campaignId,

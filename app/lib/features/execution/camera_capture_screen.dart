@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/location/get_current_position.dart';
 import '../../core/providers.dart';
 
 /// Camera-only opening evidence (spec §17: "Mandatory evidence is camera-only... no gallery for
@@ -28,6 +29,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
   String? _error;
   XFile? _capturedFile;
   Position? _capturedPosition;
+  String? _positionError;
   DateTime? _capturedAt;
   bool _saving = false;
 
@@ -66,18 +68,21 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
     try {
       final file = await controller.takePicture();
       Position? position;
+      String? positionError;
       try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-        );
-      } catch (_) {
+        position = await getCurrentPositionOrThrow();
+      } catch (e) {
         // GPS unavailable at shot time — still let the field worker review/retake; confirming
-        // without a position is blocked below, matching the milestone's mandatoryGps intent.
+        // without a position is blocked below, matching the milestone's mandatoryGps intent. The
+        // actual reason (permission denied, services off, etc.) is shown on the review screen
+        // rather than swallowed, since a silent generic message left no way to tell what to fix.
+        positionError = e.toString().replaceFirst('Exception: ', '');
       }
       if (!mounted) return;
       setState(() {
         _capturedFile = file;
         _capturedPosition = position;
+        _positionError = positionError;
         _capturedAt = DateTime.now();
       });
     } catch (e) {
@@ -89,6 +94,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
     setState(() {
       _capturedFile = null;
       _capturedPosition = null;
+      _positionError = null;
       _capturedAt = null;
     });
   }
@@ -163,8 +169,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
                 _capturedPosition != null
                     ? '${_capturedPosition!.latitude.toStringAsFixed(6)}, '
                         '${_capturedPosition!.longitude.toStringAsFixed(6)} — ${_capturedAt!.toLocal()}'
-                    : 'Location unavailable — this photo cannot be used yet',
+                    : '${_positionError ?? 'Location unavailable'} — this photo cannot be used yet. '
+                        'Retake after fixing this.',
                 textAlign: TextAlign.center,
+                style: _capturedPosition == null ? const TextStyle(color: Colors.red) : null,
               ),
             ),
             Padding(
