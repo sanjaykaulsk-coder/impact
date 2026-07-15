@@ -40,6 +40,66 @@ outbox → sync with visible statuses. Built backend-first, then the full Flutte
   `package:sqlite3` option), then reverted that setting before committing — it never touched the
   real Android build path, which still bundles its own SQLite exactly as before.
 
+### Real-device testing round: bugs found, root causes, and fixes (A-033 through A-040)
+
+The founder ran the app on their own Android phone for the first time — this is exactly what this
+sandbox cannot do, and it surfaced real problems the desktop/analyzer verification above couldn't
+catch. Each was root-caused and fixed, not just patched around:
+
+1. **`workmanager` v0.5.2 failed to compile** against the founder's (newer) installed Flutter SDK —
+   the package's own Android code used APIs from Flutter's old plugin-registration system that
+   current Flutter no longer ships. Upgraded to `workmanager: ^0.9.0+3`. (A-033)
+2. **Photo upload crashed with "Internal Server Error"** — `uploadMedia` ran MinIO upload + sharp
+   watermark compositing inside a 5-second-default Prisma transaction; a real phone photo over real
+   Wi-Fi plausibly exceeded that. Split into two short transactions with the slow work outside both.
+   (A-034)
+3. **Camera screen stuck on "Location Unavailable" even after retaking** — it never actually
+   requested location permission, just tried to read GPS and silently swallowed the failure.
+   Extracted the working permission-request logic already used by check-in/check-out into a shared
+   helper both screens now use. (A-035)
+4. **Photo upload still crashed after the transaction fix**, this time with a sharp error
+   ("Image to composite must have same dimensions or smaller") — confirmed from the founder's own
+   backend log. Root cause: the watermark's dimensions were read *before* the image's EXIF rotation
+   was actually applied, so a portrait phone photo (landscape sensor + rotation tag — normal for a
+   real phone) sized the overlay to the wrong, pre-rotation width. Fixed by materializing the
+   rotated image first, then measuring *that*. Reproduced the exact error from a synthetic
+   EXIF-rotated test image before and after the fix. (A-036)
+5. **A stuck upload just hung forever**, silently, still showing stale error text from a previous
+   attempt — `ApiClient` had no request timeout at all. Added 30s/60s timeouts and made a fresh
+   sync attempt clear the old error message. (A-037)
+
+**The founder then diagnosed three further, real problems from continued testing and pushed back
+directly: "stop guessing, fix these three."** All three were genuine gaps against
+`docs/architecture/05-offline-sync-design.md` — a design that was already approved and, in one
+case, already partially built into the schema (the `SyncStatus` enum) but never actually used:
+
+6. **Sync ordering bug**: check-out could be attempted, and correctly rejected by the server, before
+   its own milestone's photo had synced — the outbox query had no defined order and nothing
+   enforced dependency between items. Fixed with a deterministic base ordering plus an explicit
+   check: a check-out defers until every other item for its own activity has synced. Proved with
+   two tests against a real in-memory Drift database (not mocked), including the adversarial case
+   (check-out enqueued *before* its photo). (A-038)
+7. **Fragile single-shot photo upload**: doc 05 specifies chunked, resumable uploads
+   (`/media/init` → chunks → `complete`) precisely so a dropped connection only costs the
+   unconfirmed chunks, not the whole file — Session B shipped a single-shot upload instead. Built
+   the approved design for real: a new `MediaUploadSession` table, three new endpoints, chunk
+   staging on disk, idempotent resumption keyed by content hash, and exponential backoff with
+   jitter for automatic retries (an explicit "Sync now" tap still tries immediately). Verified the
+   chunk write/assemble/discard mechanism directly — wrote chunks out of order, re-sent one, and
+   confirmed the reassembled file's hash matches exactly. Honestly scoped: true OS-level "bind to
+   the network it started on" needs native Android code not added in this pass; a connectivity-
+   change check around each chunk is the practical approximation implemented instead. (A-039)
+8. **Raw exception text on screen**: the sync log was showing
+   `ClientException with SocketException errno 103` directly to a field worker. Replaced with a
+   plain Hindi+English message by default; the technical detail is still there, behind a tap, never
+   as the primary text. (A-040)
+
+**Still open, needs the founder's next real-device test to confirm**: the actual root cause of the
+original Wi-Fi connection drops (A-037/A-039) is not fully confirmed — the fixes make it *recover*
+correctly (resumable chunks, bounded timeouts, backoff) rather than claim to have eliminated
+whatever was causing the drops in the first place. The founder's planned retest — full visit +
+airplane-mode test — is exactly the right way to confirm this.
+
 ## Stage 2 Session A — admin thread (previous session, after Phase C approval)
 
 Per `docs/architecture/09-mvp-build-sequence.md`: campaign builder essentials → minimal form
@@ -83,7 +143,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - Monorepo scaffold: `backend/` (NestJS), `web/` (Next.js), `app/` (Flutter), `shared/` (TS API types), `docs/`
 - Phase A docs carried over: `CLAUDE.md`, `README.md`, `docs/FIELD_COMMAND_SPEC.md`, **full architecture pack 01–09** (01/03/04/06/09 were missing at Phase C's start per A-011 — recovered mid-session from the founder's Phase A zip export and added; the gap logged in A-011 is now closed)
 - `docs/reference/`: `Type_of_Campaign.xlsx` (21 real historical campaign-report sheets — DFR, Profile, Stock Reconciliation, Enquiry formats; contains real contact numbers and client sales figures, kept per the founder's explicit confirmation it's Impact's own proprietary data), `Type_of_Campaign_formats.md` (the founder's own PII-masked structural conversion of the same workbook, covering all 21 sheets), and `report-format-library.md` (Claude's distillation — see A-023 — cross-checked against the founder's structural conversion, which confirmed every finding and added real production-scale evidence: 27,032 real rows in one sheet alone. The founder's original *directives* document of the same name still hasn't successfully uploaded after three attempts)
-- `docs/ASSUMPTIONS.md`: 32 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
+- `docs/ASSUMPTIONS.md`: 40 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
 - App branding: the founder's logo integrated into both the web admin (favicon, login header, sidebar) and the Flutter app (Android launcher icons, login header) — verified visually on both
 
 **Infrastructure**
@@ -121,6 +181,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 3. Two Docker/tooling environment issues (image registry policy block, stale TypeScript incremental-build cache) — resolved, documented, no impact on the founder's own machine.
 4. **Offline-submission idempotency gap** (A-031): the server-assigned device ID was never persisted client-side in the Flutter app, which the backend needs to safely dedupe a retried offline milestone-form submission. Found while wiring the offline outbox, before it could cause a silent duplicate in the field. Fixed by persisting it at OTP-verification time.
 5. **Widget test not mocking a newly-added dependency** (A-032): adding the live assignment list to the campaign home screen broke an existing widget test, which now attempted a real network call. Fixed by adding a fake execution-repository override matching the test's existing pattern.
+6. **Real bugs found only by testing on a real phone** (A-033 through A-037): an outdated plugin incompatible with a newer Flutter SDK, a database transaction held open across slow photo-upload I/O, a camera screen that never actually requested location permission, an EXIF-rotation bug in the watermark compositor, and network requests with no timeout at all. See the "Real-device testing round" section above for the full account — this is exactly the class of bug that only shows up off a desktop simulator.
+7. **Sync-queue ordering bug, founder-diagnosed** (A-038): check-out could be attempted, and correctly rejected, before its own photo had synced — an unordered query plus no dependency enforcement between related outbox items. Fixed with deterministic ordering and an explicit wait-for-dependencies check, proved with two tests against a real (non-mocked) Drift database.
+8. **Design-doc deviation, founder-diagnosed** (A-039): Session B shipped a single-shot photo upload despite `docs/architecture/05` specifying chunked, resumable uploads — the schema even already had the `SyncStatus` states for it (`UPLOADING`, `PARTIALLY_UPLOADED`), just unused. Rebuilt to match the approved design: init/chunk/complete endpoints, disk-staged chunks, content-hash-based idempotent resumption, exponential backoff with jitter.
 
 ## Known limitations, logged and not silently hidden
 - **A-017**: the schema's role-assignment table is always campaign-scoped; there's no clean way yet to express a true platform-wide role. Worked around in seed data; flagged for a real fix in a later module.
@@ -134,8 +197,11 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023.
 
 ## Open items for the founder
-1. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
-2. Try the field app's assignment → check-in → photo → form flow on your own Android phone — this is the first time camera and GPS can actually be confirmed, since this build machine has neither
+1. Retest on your phone per your plan: full visit end-to-end, plus the airplane-mode test — this
+   directly confirms the three fixes above (A-038/A-039/A-040) and, more importantly, whether the
+   underlying Wi-Fi connection drops are actually resolved, which can only be confirmed on a real
+   device with real network conditions
+2. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
 3. Decide how you'd like to see it running — two options, see below
 4. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 

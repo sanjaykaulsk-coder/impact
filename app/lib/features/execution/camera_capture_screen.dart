@@ -132,7 +132,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
         filePath: savedPath,
       );
       try {
-        await ref.read(syncServiceProvider).syncPending();
+        await ref.read(syncServiceProvider).syncPending(force: true);
       } catch (_) {
         // Queued regardless — will retry on the next sync trigger.
       }

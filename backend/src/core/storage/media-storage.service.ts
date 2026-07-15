@@ -1,5 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import * as Minio from 'minio';
 import sharp from 'sharp';
 
@@ -116,5 +118,38 @@ export class MediaStorageService implements OnModuleInit {
   async getSignedGetUrl(objectKey: string): Promise<string> {
     const ttlSeconds = Number(process.env.MINIO_SIGNED_URL_TTL_SECONDS ?? '900');
     return this.client.presignedGetObject(this.bucket, objectKey, ttlSeconds);
+  }
+
+  // --- Chunked upload staging (docs/architecture/05's resumable-media strategy) ---
+  // Chunk bytes are staged on local disk, keyed by upload-session id, rather than in Postgres or
+  // MinIO — they're transient (deleted once /complete assembles and stores the final object, or
+  // the session is abandoned), so neither the database nor the object store is the right home for
+  // them. A chunk's on-disk presence is itself the durable record of "this chunk was received,"
+  // which is what makes an upload genuinely resumable across a dropped connection: the client
+  // re-inits into the same session and finds out exactly which chunks the server already has.
+  private chunkSessionDir(sessionId: string): string {
+    const root = process.env.MEDIA_UPLOAD_TMP_DIR ?? path.join(process.cwd(), 'tmp', 'media-uploads');
+    return path.join(root, sessionId);
+  }
+
+  private chunkFilePath(sessionId: string, index: number): string {
+    return path.join(this.chunkSessionDir(sessionId), `chunk-${String(index).padStart(6, '0')}`);
+  }
+
+  async writeChunk(sessionId: string, index: number, buffer: Buffer): Promise<void> {
+    await fs.mkdir(this.chunkSessionDir(sessionId), { recursive: true });
+    await fs.writeFile(this.chunkFilePath(sessionId, index), buffer);
+  }
+
+  async assembleChunks(sessionId: string, totalChunks: number): Promise<Buffer> {
+    const parts: Buffer[] = [];
+    for (let i = 0; i < totalChunks; i++) {
+      parts.push(await fs.readFile(this.chunkFilePath(sessionId, i)));
+    }
+    return Buffer.concat(parts);
+  }
+
+  async discardChunks(sessionId: string): Promise<void> {
+    await fs.rm(this.chunkSessionDir(sessionId), { recursive: true, force: true });
   }
 }

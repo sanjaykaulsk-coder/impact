@@ -37,30 +37,53 @@ class ExecutionRepository {
     return CheckInResult.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<MediaRecord> uploadMedia(
+  // Chunked, resumable upload (docs/architecture/05) — a single-shot upload doesn't survive a
+  // real phone's real Wi-Fi dropping mid-transfer; see SyncService for the chunk loop that calls
+  // these three in sequence and can resume from wherever the last attempt left off.
+  Future<MediaUploadInitResult> initMediaUpload(
     String campaignId,
     String activityInstanceId, {
-    required List<int> fileBytes,
-    required String fileName,
+    required String sha256Hash,
+    required int sizeBytes,
     required String mimeType,
     required double latitude,
     required double longitude,
     required DateTime capturedAt,
     String? deviceId,
   }) async {
+    final json = await api.post('/campaigns/$campaignId/activity-instances/$activityInstanceId/media/init', {
+      'sha256Hash': sha256Hash,
+      'sizeBytes': sizeBytes,
+      'mimeType': mimeType,
+      'latitude': latitude,
+      'longitude': longitude,
+      'capturedAt': capturedAt.toIso8601String(),
+      'deviceId': ?deviceId,
+    });
+    return MediaUploadInitResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<List<int>> uploadMediaChunk(
+    String campaignId,
+    String activityInstanceId,
+    String sessionId,
+    int index,
+    List<int> chunkBytes,
+  ) async {
     final json = await api.postMultipart(
-      '/campaigns/$campaignId/activity-instances/$activityInstanceId/media',
-      fileBytes: fileBytes,
-      fileFieldName: 'file',
-      fileName: fileName,
-      mimeType: mimeType,
-      fields: {
-        'latitude': latitude.toString(),
-        'longitude': longitude.toString(),
-        'capturedAt': capturedAt.toIso8601String(),
-        'deviceId': ?deviceId,
-      },
+      '/campaigns/$campaignId/activity-instances/$activityInstanceId/media/sessions/$sessionId/chunks/$index',
+      fileBytes: chunkBytes,
+      fileFieldName: 'chunk',
+      fileName: 'chunk-$index',
+      mimeType: 'application/octet-stream',
+      fields: const {},
     );
+    return ((json as Map<String, dynamic>)['receivedChunks'] as List<dynamic>).cast<int>();
+  }
+
+  Future<MediaRecord> completeMediaUpload(String campaignId, String activityInstanceId, String sessionId) async {
+    final json =
+        await api.post('/campaigns/$campaignId/activity-instances/$activityInstanceId/media/sessions/$sessionId/complete', const {});
     return MediaRecord.fromJson(json as Map<String, dynamic>);
   }
 

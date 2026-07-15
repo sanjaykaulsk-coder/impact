@@ -92,6 +92,29 @@ class $OutboxItemsTable extends OutboxItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _retryCountMeta = const VerificationMeta(
+    'retryCount',
+  );
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+    'retry_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _nextRetryAtMeta = const VerificationMeta(
+    'nextRetryAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextRetryAt = GeneratedColumn<DateTime>(
+    'next_retry_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -126,6 +149,8 @@ class $OutboxItemsTable extends OutboxItems
     filePath,
     status,
     errorMessage,
+    retryCount,
+    nextRetryAt,
     createdAt,
     updatedAt,
   ];
@@ -205,6 +230,21 @@ class $OutboxItemsTable extends OutboxItems
         ),
       );
     }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+        _retryCountMeta,
+        retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
+      );
+    }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+        _nextRetryAtMeta,
+        nextRetryAt.isAcceptableOrUnknown(
+          data['next_retry_at']!,
+          _nextRetryAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -258,6 +298,14 @@ class $OutboxItemsTable extends OutboxItems
         DriftSqlType.string,
         data['${effectivePrefix}error_message'],
       ),
+      retryCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retry_count'],
+      )!,
+      nextRetryAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_retry_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -284,6 +332,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
   final String? filePath;
   final String status;
   final String? errorMessage;
+  final int retryCount;
+  final DateTime? nextRetryAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const OutboxItem({
@@ -295,6 +345,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
     this.filePath,
     required this.status,
     this.errorMessage,
+    required this.retryCount,
+    this.nextRetryAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -312,6 +364,10 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || errorMessage != null) {
       map['error_message'] = Variable<String>(errorMessage);
+    }
+    map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -332,6 +388,10 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
       errorMessage: errorMessage == null && nullToAbsent
           ? const Value.absent()
           : Value(errorMessage),
+      retryCount: Value(retryCount),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -353,6 +413,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
       filePath: serializer.fromJson<String?>(json['filePath']),
       status: serializer.fromJson<String>(json['status']),
       errorMessage: serializer.fromJson<String?>(json['errorMessage']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
+      nextRetryAt: serializer.fromJson<DateTime?>(json['nextRetryAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -369,6 +431,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
       'filePath': serializer.toJson<String?>(filePath),
       'status': serializer.toJson<String>(status),
       'errorMessage': serializer.toJson<String?>(errorMessage),
+      'retryCount': serializer.toJson<int>(retryCount),
+      'nextRetryAt': serializer.toJson<DateTime?>(nextRetryAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -383,6 +447,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
     Value<String?> filePath = const Value.absent(),
     String? status,
     Value<String?> errorMessage = const Value.absent(),
+    int? retryCount,
+    Value<DateTime?> nextRetryAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => OutboxItem(
@@ -394,6 +460,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
     filePath: filePath.present ? filePath.value : this.filePath,
     status: status ?? this.status,
     errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
+    retryCount: retryCount ?? this.retryCount,
+    nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -415,6 +483,12 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
       errorMessage: data.errorMessage.present
           ? data.errorMessage.value
           : this.errorMessage,
+      retryCount: data.retryCount.present
+          ? data.retryCount.value
+          : this.retryCount,
+      nextRetryAt: data.nextRetryAt.present
+          ? data.nextRetryAt.value
+          : this.nextRetryAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -431,6 +505,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
           ..write('filePath: $filePath, ')
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -447,6 +523,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
     filePath,
     status,
     errorMessage,
+    retryCount,
+    nextRetryAt,
     createdAt,
     updatedAt,
   );
@@ -462,6 +540,8 @@ class OutboxItem extends DataClass implements Insertable<OutboxItem> {
           other.filePath == this.filePath &&
           other.status == this.status &&
           other.errorMessage == this.errorMessage &&
+          other.retryCount == this.retryCount &&
+          other.nextRetryAt == this.nextRetryAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -475,6 +555,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
   final Value<String?> filePath;
   final Value<String> status;
   final Value<String?> errorMessage;
+  final Value<int> retryCount;
+  final Value<DateTime?> nextRetryAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -487,6 +569,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
     this.filePath = const Value.absent(),
     this.status = const Value.absent(),
     this.errorMessage = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -500,6 +584,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
     this.filePath = const Value.absent(),
     this.status = const Value.absent(),
     this.errorMessage = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -517,6 +603,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
     Expression<String>? filePath,
     Expression<String>? status,
     Expression<String>? errorMessage,
+    Expression<int>? retryCount,
+    Expression<DateTime>? nextRetryAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -531,6 +619,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
       if (filePath != null) 'file_path': filePath,
       if (status != null) 'status': status,
       if (errorMessage != null) 'error_message': errorMessage,
+      if (retryCount != null) 'retry_count': retryCount,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -546,6 +636,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
     Value<String?>? filePath,
     Value<String>? status,
     Value<String?>? errorMessage,
+    Value<int>? retryCount,
+    Value<DateTime?>? nextRetryAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -559,6 +651,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
       filePath: filePath ?? this.filePath,
       status: status ?? this.status,
       errorMessage: errorMessage ?? this.errorMessage,
+      retryCount: retryCount ?? this.retryCount,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -592,6 +686,12 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
     if (errorMessage.present) {
       map['error_message'] = Variable<String>(errorMessage.value);
     }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -615,6 +715,8 @@ class OutboxItemsCompanion extends UpdateCompanion<OutboxItem> {
           ..write('filePath: $filePath, ')
           ..write('status: $status, ')
           ..write('errorMessage: $errorMessage, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -644,6 +746,8 @@ typedef $$OutboxItemsTableCreateCompanionBuilder =
       Value<String?> filePath,
       Value<String> status,
       Value<String?> errorMessage,
+      Value<int> retryCount,
+      Value<DateTime?> nextRetryAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -658,6 +762,8 @@ typedef $$OutboxItemsTableUpdateCompanionBuilder =
       Value<String?> filePath,
       Value<String> status,
       Value<String?> errorMessage,
+      Value<int> retryCount,
+      Value<DateTime?> nextRetryAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -709,6 +815,16 @@ class $$OutboxItemsTableFilterComposer
 
   ColumnFilters<String> get errorMessage => $composableBuilder(
     column: $table.errorMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -772,6 +888,16 @@ class $$OutboxItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -824,6 +950,16 @@ class $$OutboxItemsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -870,6 +1006,8 @@ class $$OutboxItemsTableTableManager
                 Value<String?> filePath = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> errorMessage = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -882,6 +1020,8 @@ class $$OutboxItemsTableTableManager
                 filePath: filePath,
                 status: status,
                 errorMessage: errorMessage,
+                retryCount: retryCount,
+                nextRetryAt: nextRetryAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -896,6 +1036,8 @@ class $$OutboxItemsTableTableManager
                 Value<String?> filePath = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> errorMessage = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -908,6 +1050,8 @@ class $$OutboxItemsTableTableManager
                 filePath: filePath,
                 status: status,
                 errorMessage: errorMessage,
+                retryCount: retryCount,
+                nextRetryAt: nextRetryAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

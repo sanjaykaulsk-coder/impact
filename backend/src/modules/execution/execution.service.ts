@@ -1,11 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
+import { InitMediaUploadDto } from './dto/init-media-upload.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
-import { UploadMediaDto } from './dto/upload-media.dto';
 
 /** Great-circle distance in metres — used to check a field worker's GPS position against the
  * planned location, same tolerance concept as CampaignBranding's deviationToleranceMeters. */
@@ -163,72 +165,204 @@ export class ExecutionService {
     });
   }
 
-  async uploadMedia(
-    tenant: TenantContext,
-    activityInstanceId: string,
-    userId: string,
-    file: Express.Multer.File,
-    dto: UploadMediaDto,
-  ) {
-    // The MinIO upload + watermark rendering below is genuinely slow (real phone photos over a
-    // real network, plus image compositing) and must never run inside a Prisma interactive
-    // transaction — those default to a 5-second timeout, easily exceeded by a real capture, which
-    // surfaced as an "Internal Server Error" on real-device testing. So this reads what it needs
-    // in one short transaction, does the slow work with no transaction open, then writes the
-    // result in a second short transaction — never holding a DB transaction open across I/O.
-    const { activity, uploaderFullName } = await this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
-      const activity = await tx.activityInstance.findUniqueOrThrow({
-        where: { id: activityInstanceId },
-        include: { pjpRow: true },
-      });
-      this.assertOwnership(activity, userId);
-      const uploader = await tx.user.findUnique({ where: { id: userId }, select: { fullName: true } });
-      return { activity, uploaderFullName: uploader?.fullName ?? 'Field user' };
-    });
+  // --- Chunked, resumable media upload (docs/architecture/05's approved design) ---
+  // A single-shot upload was tried first and broke on real devices: a multi-second transfer over
+  // real Wi-Fi has a real chance of the connection dropping mid-transfer (network handover, a weak
+  // signal), and a single-shot upload has no way to recover except discarding everything and
+  // starting over. This three-step flow (init -> chunks -> complete) means a dropped connection
+  // only costs the chunks not yet confirmed — /init is idempotent on content hash, so resuming
+  // finds the same session and the client only re-sends what the server doesn't already have.
 
-    const stored = await this.media.uploadEvidencePhoto({
-      buffer: file.buffer,
-      mimeType: file.mimetype,
-      clientId: tenant.clientId,
-      campaignId: tenant.campaignId,
-      watermark: {
-        locationName: activity.pjpRow?.locationName ?? 'Field location',
-        capturedAt: new Date(dto.capturedAt),
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        userFullName: uploaderFullName,
-      },
-    });
-
+  /** Starts or resumes a chunked upload for one photo, keyed by its content hash. */
+  async initMediaUpload(tenant: TenantContext, activityInstanceId: string, userId: string, dto: InitMediaUploadDto) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
-      // Duplicate-photo detection (spec §17): the exact same bytes already uploaded for this
-      // activity is returned as-is rather than stored (and billed for storage) twice.
-      const existing = await tx.media.findFirst({
-        where: { activityInstanceId, sha256Hash: stored.sha256Hash },
-      });
-      if (existing) return existing;
+      const activity = await tx.activityInstance.findUniqueOrThrow({ where: { id: activityInstanceId } });
+      this.assertOwnership(activity, userId);
 
-      return tx.media.create({
+      // Already stored under this exact content hash — e.g. the client's own earlier /complete
+      // call succeeded but it never saw the response. Hand back the existing Media rather than
+      // starting a pointless new session for bytes the server already has.
+      const existingMedia = await tx.media.findFirst({ where: { activityInstanceId, sha256Hash: dto.sha256Hash } });
+      if (existingMedia) return { alreadyComplete: true as const, media: existingMedia };
+
+      const existingSession = await tx.mediaUploadSession.findUnique({
+        where: {
+          activityInstanceId_uploadedByUserId_sha256Hash: {
+            activityInstanceId,
+            uploadedByUserId: userId,
+            sha256Hash: dto.sha256Hash,
+          },
+        },
+      });
+      if (existingSession?.status === 'UPLOADING') {
+        return { alreadyComplete: false as const, session: existingSession };
+      }
+      if (existingSession) {
+        // Stale (completed-under-a-race or abandoned-after-a-corrupt-assembly) state for this
+        // exact content hash — start clean rather than resume something unresumable.
+        await this.media.discardChunks(existingSession.id);
+        await tx.mediaUploadSession.delete({ where: { id: existingSession.id } });
+      }
+
+      const session = await tx.mediaUploadSession.create({
         data: {
           clientId: tenant.clientId,
           campaignId: tenant.campaignId,
           activityInstanceId,
           uploadedByUserId: userId,
           deviceId: dto.deviceId,
-          objectKeyOriginal: stored.objectKeyOriginal,
-          objectKeyWatermarked: stored.objectKeyWatermarked,
-          mimeType: file.mimetype,
-          sizeBytes: stored.sizeBytes,
-          sha256Hash: stored.sha256Hash,
+          sha256Hash: dto.sha256Hash,
+          sizeBytes: dto.sizeBytes,
+          mimeType: dto.mimeType,
+          chunkSize: CHUNK_SIZE_BYTES,
+          totalChunks: Math.ceil(dto.sizeBytes / CHUNK_SIZE_BYTES),
           latitude: dto.latitude,
           longitude: dto.longitude,
           capturedAt: new Date(dto.capturedAt),
-          variant: 'ORIGINAL',
-          validationStatus: 'PENDING',
-          approvalStatus: 'PENDING',
-          uploadStatus: 'SYNCED',
         },
       });
+      return { alreadyComplete: false as const, session };
+    });
+  }
+
+  /** Accepts one chunk. Chunks may arrive in any order and be re-sent safely (writing the same
+   * index twice just overwrites the same staged file with identical bytes). */
+  async uploadMediaChunk(
+    tenant: TenantContext,
+    activityInstanceId: string,
+    userId: string,
+    sessionId: string,
+    index: number,
+    chunk: Buffer,
+  ) {
+    const session = await this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({ where: { id: activityInstanceId } });
+      this.assertOwnership(activity, userId);
+      const session = await tx.mediaUploadSession.findUniqueOrThrow({ where: { id: sessionId } });
+      if (session.activityInstanceId !== activityInstanceId || session.uploadedByUserId !== userId) {
+        throw new ForbiddenException('This upload session does not belong to you');
+      }
+      if (session.status !== 'UPLOADING') {
+        throw new BadRequestException('This upload session is no longer accepting chunks');
+      }
+      if (index < 0 || index >= session.totalChunks) {
+        throw new BadRequestException(`Chunk index out of range (expected 0-${session.totalChunks - 1})`);
+      }
+      return session;
+    });
+
+    // Disk I/O, deliberately outside the transaction above — same discipline as the rest of this
+    // module's media handling (see the transaction-split note this replaced).
+    await this.media.writeChunk(sessionId, index, chunk);
+
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const receivedChunks = Array.from(new Set([...session.receivedChunks, index])).sort((a, b) => a - b);
+      const updated = await tx.mediaUploadSession.update({ where: { id: sessionId }, data: { receivedChunks } });
+      return { receivedChunks: updated.receivedChunks, totalChunks: updated.totalChunks };
+    });
+  }
+
+  /** Assembles every received chunk, re-verifies the whole-file hash the client declared at
+   * /init, then runs the existing watermark+storage pipeline exactly as the old single-shot
+   * upload did. */
+  async completeMediaUpload(tenant: TenantContext, activityInstanceId: string, userId: string, sessionId: string) {
+    const prep = await this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({
+        where: { id: activityInstanceId },
+        include: { pjpRow: true },
+      });
+      this.assertOwnership(activity, userId);
+      const session = await tx.mediaUploadSession.findUniqueOrThrow({ where: { id: sessionId } });
+      if (session.activityInstanceId !== activityInstanceId || session.uploadedByUserId !== userId) {
+        throw new ForbiddenException('This upload session does not belong to you');
+      }
+      if (session.status === 'COMPLETED' && session.resultMediaId) {
+        // Already finished by an earlier call whose response the client never saw.
+        const media = await tx.media.findUnique({ where: { id: session.resultMediaId } });
+        if (media) return { done: true as const, media };
+      }
+      if (session.status !== 'UPLOADING') {
+        throw new BadRequestException('This upload session cannot be completed');
+      }
+      const received = new Set(session.receivedChunks);
+      const missing: number[] = [];
+      for (let i = 0; i < session.totalChunks; i++) if (!received.has(i)) missing.push(i);
+      if (missing.length > 0) throw new BadRequestException(`Missing chunk(s): ${missing.join(', ')}`);
+
+      const uploader = await tx.user.findUnique({ where: { id: userId }, select: { fullName: true } });
+      return {
+        done: false as const,
+        session,
+        locationName: activity.pjpRow?.locationName ?? 'Field location',
+        uploaderFullName: uploader?.fullName ?? 'Field user',
+      };
+    });
+    if (prep.done) return prep.media;
+    const { session, locationName, uploaderFullName } = prep;
+
+    const assembled = await this.media.assembleChunks(session.id, session.totalChunks);
+    const actualHash = createHash('sha256').update(assembled).digest('hex');
+    if (actualHash !== session.sha256Hash) {
+      // Corrupt/truncated transfer — never store it. Abandon this session so a later /init call
+      // for the same content hash starts clean instead of retrying against permanently-broken
+      // staged chunks.
+      await this.media.discardChunks(session.id);
+      await this.prisma.runInTenantContext(tenant.clientId, (tx) =>
+        tx.mediaUploadSession.update({ where: { id: session.id }, data: { status: 'ABANDONED' } }),
+      );
+      throw new BadRequestException('Uploaded content does not match its checksum — please retake the photo');
+    }
+
+    const stored = await this.media.uploadEvidencePhoto({
+      buffer: assembled,
+      mimeType: session.mimeType,
+      clientId: tenant.clientId,
+      campaignId: tenant.campaignId,
+      watermark: {
+        locationName,
+        capturedAt: session.capturedAt,
+        latitude: Number(session.latitude),
+        longitude: Number(session.longitude),
+        userFullName: uploaderFullName,
+      },
+    });
+    await this.media.discardChunks(session.id);
+
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      // Duplicate-photo detection (spec §17): the exact same bytes already uploaded for this
+      // activity is returned as-is rather than stored (and billed for storage) twice.
+      const existing = await tx.media.findFirst({
+        where: { activityInstanceId: session.activityInstanceId, sha256Hash: stored.sha256Hash },
+      });
+      const mediaRow =
+        existing ??
+        (await tx.media.create({
+          data: {
+            clientId: tenant.clientId,
+            campaignId: tenant.campaignId,
+            activityInstanceId: session.activityInstanceId,
+            uploadedByUserId: session.uploadedByUserId,
+            deviceId: session.deviceId,
+            objectKeyOriginal: stored.objectKeyOriginal,
+            objectKeyWatermarked: stored.objectKeyWatermarked,
+            mimeType: session.mimeType,
+            sizeBytes: stored.sizeBytes,
+            sha256Hash: stored.sha256Hash,
+            latitude: session.latitude,
+            longitude: session.longitude,
+            capturedAt: session.capturedAt,
+            variant: 'ORIGINAL',
+            validationStatus: 'PENDING',
+            approvalStatus: 'PENDING',
+            uploadStatus: 'SYNCED',
+          },
+        }));
+
+      await tx.mediaUploadSession.update({
+        where: { id: session.id },
+        data: { status: 'COMPLETED', resultMediaId: mediaRow.id },
+      });
+      return mediaRow;
     });
   }
 

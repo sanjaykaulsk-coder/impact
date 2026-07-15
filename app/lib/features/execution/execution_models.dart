@@ -232,6 +232,41 @@ class ActivityBundle {
       );
 }
 
+// Response from POST .../media/init — either the content is already stored (a previous /complete
+// succeeded but the client never saw the response) or a resumable session is ready, reporting
+// which chunks the server already has so the client only sends what's missing.
+class MediaUploadInitResult {
+  final bool alreadyComplete;
+  final MediaRecord? media;
+  final String? sessionId;
+  final int? totalChunks;
+  final List<int> receivedChunks;
+
+  MediaUploadInitResult({
+    required this.alreadyComplete,
+    this.media,
+    this.sessionId,
+    this.totalChunks,
+    this.receivedChunks = const [],
+  });
+
+  factory MediaUploadInitResult.fromJson(Map<String, dynamic> json) {
+    if (json['alreadyComplete'] == true) {
+      return MediaUploadInitResult(
+        alreadyComplete: true,
+        media: MediaRecord.fromJson(json['media'] as Map<String, dynamic>),
+      );
+    }
+    final session = json['session'] as Map<String, dynamic>;
+    return MediaUploadInitResult(
+      alreadyComplete: false,
+      sessionId: session['id'] as String,
+      totalChunks: session['totalChunks'] as int,
+      receivedChunks: (session['receivedChunks'] as List<dynamic>? ?? []).cast<int>(),
+    );
+  }
+}
+
 class CheckInResult {
   final double? distanceFromPlannedMeters;
   final int toleranceMeters;

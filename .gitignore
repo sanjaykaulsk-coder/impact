@@ -31,6 +31,9 @@ Thumbs.db
 # Prisma
 backend/generated/
 
+# Chunked-upload staging (docs/architecture/05) — transient, never committed
+backend/tmp/
+
 # Flutter / Dart
 app/.dart_tool/
 app/.flutter-plugins

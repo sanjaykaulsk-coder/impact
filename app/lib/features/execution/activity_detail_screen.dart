@@ -48,7 +48,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   Future<void> _syncNow() async {
     try {
-      await ref.read(syncServiceProvider).syncPending();
+      await ref.read(syncServiceProvider).syncPending(force: true);
     } catch (_) {
       // Best-effort — the outbox keeps the item queued for the next trigger regardless.
     }
@@ -274,13 +274,40 @@ class _RequirementTile extends StatelessWidget {
   }
 }
 
-class _OutboxStatusTile extends StatelessWidget {
+/// Field users must never see a raw exception string (spec-adjacent founder directive after
+/// real-device testing surfaced `ClientException with SocketException errno 103` on screen) — the
+/// sync log's default view is a plain bilingual message; the technical detail stays available
+/// behind a tap for support/diagnosis, never as the primary text.
+String _friendlyErrorMessage(OutboxItem item) {
+  final raw = item.errorMessage?.toLowerCase() ?? '';
+  if (raw.contains('socketexception') || raw.contains('connection abort') || raw.contains('network changed')) {
+    return 'फोटो अपलोड रुक गया — अपने आप दोबारा कोशिश होगी। सलाह: वाई-फाई पर रहें।\n'
+        'Photo upload paused — will retry automatically. Tip: stay on Wi-Fi.';
+  }
+  if (raw.contains('timeoutexception') || raw.contains('timed out')) {
+    return 'अपलोड में देर हो रही है — दोबारा कोशिश होगी।\nThis is taking longer than expected — will retry automatically.';
+  }
+  if (item.type == 'checkOut' && raw.contains('photo')) {
+    return 'फोटो अपलोड होने का इंतज़ार है।\nWaiting for the photo to finish uploading first.';
+  }
+  return 'सिंक नहीं हो सका — दोबारा कोशिश होगी।\nCouldn\'t sync this — will retry automatically.';
+}
+
+class _OutboxStatusTile extends StatefulWidget {
   final OutboxItem item;
   final VoidCallback? onRetake;
   const _OutboxStatusTile({required this.item, this.onRetake});
 
   @override
+  State<_OutboxStatusTile> createState() => _OutboxStatusTileState();
+}
+
+class _OutboxStatusTileState extends State<_OutboxStatusTile> {
+  bool _showTechnicalDetail = false;
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final Color color = switch (item.status) {
       'synced' => Colors.green,
       'syncing' => Colors.blue,
@@ -291,9 +318,25 @@ class _OutboxStatusTile extends StatelessWidget {
       dense: true,
       leading: Icon(Icons.circle, size: 12, color: color),
       title: Text(_labelFor(item.type)),
-      subtitle: item.errorMessage != null ? Text(item.errorMessage!, style: const TextStyle(color: Colors.red)) : null,
-      trailing: onRetake != null
-          ? TextButton(onPressed: onRetake, child: const Text('Retake'))
+      subtitle: item.errorMessage == null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_friendlyErrorMessage(item), style: const TextStyle(color: Colors.red)),
+                InkWell(
+                  onTap: () => setState(() => _showTechnicalDetail = !_showTechnicalDetail),
+                  child: Text(
+                    _showTechnicalDetail ? 'Hide technical details' : 'Technical details',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline),
+                  ),
+                ),
+                if (_showTechnicalDetail)
+                  Text(item.errorMessage!, style: TextStyle(color: Colors.grey.shade700, fontSize: 11)),
+              ],
+            ),
+      trailing: widget.onRetake != null
+          ? TextButton(onPressed: widget.onRetake, child: const Text('Retake'))
           : Text(item.status),
     );
   }

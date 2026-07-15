@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   UploadedFile,
   UseGuards,
@@ -15,12 +16,11 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { CampaignScopeGuard } from '../../common/guards/campaign-scope.guard';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
+import { InitMediaUploadDto } from './dto/init-media-upload.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
-import { UploadMediaDto } from './dto/upload-media.dto';
 import { ExecutionService } from './execution.service';
-
-const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 
 // Every route here is a field worker acting on their own assignment/activity — gated by
 // CampaignScopeGuard (an active role in the campaign) plus ExecutionService's own ownership check
@@ -68,20 +68,48 @@ export class ExecutionController {
   // that's a client-side constraint (see the Flutter capture screen), not something the API can
   // enforce on the bytes it receives, so the API's job is capturing GPS+timestamp alongside every
   // upload and burning them into a watermark, not policing where the JPEG came from.
+  //
+  // Chunked, resumable upload (docs/architecture/05): init -> N chunk posts -> complete. A
+  // single-shot upload was tried first and doesn't survive a real phone's real Wi-Fi dropping
+  // mid-transfer — see ExecutionService's comment on why this replaced it.
   @RequirePermissions('create')
-  @Post('activity-instances/:activityInstanceId/media')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PHOTO_BYTES } }))
-  uploadMedia(
+  @Post('activity-instances/:activityInstanceId/media/init')
+  initMediaUpload(
     @Param('campaignId') _campaignId: string,
     @Param('activityInstanceId') activityInstanceId: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() dto: UploadMediaDto,
+    @Body() dto: InitMediaUploadDto,
     @CurrentTenant() tenant: TenantContext,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    if (!file) throw new BadRequestException('No photo was uploaded');
-    if (!file.mimetype.startsWith('image/')) throw new BadRequestException('Only image uploads are accepted here');
-    return this.execution.uploadMedia(tenant, activityInstanceId, user.id, file, dto);
+    return this.execution.initMediaUpload(tenant, activityInstanceId, user.id, dto);
+  }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/media/sessions/:sessionId/chunks/:index')
+  @UseInterceptors(FileInterceptor('chunk', { limits: { fileSize: CHUNK_SIZE_BYTES } }))
+  uploadMediaChunk(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @Param('sessionId') sessionId: string,
+    @Param('index', ParseIntPipe) index: number,
+    @UploadedFile() chunk: Express.Multer.File,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!chunk) throw new BadRequestException('No chunk was uploaded');
+    return this.execution.uploadMediaChunk(tenant, activityInstanceId, user.id, sessionId, index, chunk.buffer);
+  }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/media/sessions/:sessionId/complete')
+  completeMediaUpload(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @Param('sessionId') sessionId: string,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.execution.completeMediaUpload(tenant, activityInstanceId, user.id, sessionId);
   }
 
   @RequirePermissions('create')
