@@ -32,15 +32,30 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   String get _campaignId => ref.read(authControllerProvider).selectedCampaignId!;
 
   Future<void> _load() async {
+    // Only the very first load (no bundle yet) blocks the screen on failure — this screen is
+    // called again after every offline-capable action (photo, form) to pick up any server-side
+    // changes, and that refresh is expected to fail while offline (the whole point of the
+    // airplane-mode flow). Wiping the screen and losing sight of "check-in done, photo just
+    // queued" on every offline action would defeat the purpose of the outbox in the first place —
+    // "the UI reads from local state" (docs/architecture/05) means a failed refresh keeps showing
+    // whatever was last known, not a blank error screen.
+    final isInitialLoad = _bundle == null;
     setState(() {
-      _loading = true;
-      _error = null;
+      _loading = isInitialLoad;
+      if (isInitialLoad) _error = null;
     });
     try {
       final bundle = await ref.read(executionRepositoryProvider).getOrCreateActivity(_campaignId, widget.assignmentId);
       if (mounted) setState(() => _bundle = bundle);
     } catch (e) {
-      if (mounted) setState(() => _error = e is ApiException ? e.message : e.toString());
+      if (!mounted) return;
+      if (isInitialLoad) {
+        setState(() => _error = e is ApiException ? e.message : e.toString());
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not refresh from the server — showing what\'s saved on this device.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
