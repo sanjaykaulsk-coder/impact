@@ -51,7 +51,7 @@ export class ExecutionService {
       include: { pjpRow: true, currentStage: { include: { milestones: { orderBy: { order: 'asc' }, include: MILESTONE_INCLUDE } } } },
     });
     const milestone = activity.currentStage?.milestones[0] ?? null;
-    const [checkIn, checkOut, media, formResponse] = await Promise.all([
+    const [checkIn, checkOut, media, formResponse, approval] = await Promise.all([
       tx.checkIn.findFirst({ where: { activityInstanceId } }),
       tx.checkOut.findFirst({ where: { activityInstanceId } }),
       tx.media.findMany({ where: { activityInstanceId }, orderBy: { createdAt: 'asc' } }),
@@ -59,8 +59,11 @@ export class ExecutionService {
         where: { activityInstanceId },
         include: { fieldResponses: true },
       }),
+      // One Approval row per activity, reused across reject -> resubmit -> approve cycles (see
+      // supervisor.service.ts) — this is the field app's view of the supervisor's decision.
+      tx.approval.findFirst({ where: { entityType: 'ACTIVITY_INSTANCE', entityId: activityInstanceId } }),
     ]);
-    return { activity, milestone, checkIn, checkOut, media, formResponse };
+    return { activity, milestone, checkIn, checkOut, media, formResponse, approval };
   }
 
   /** Finds (or, on first open, creates) the ActivityInstance behind a given assignment. A field
@@ -461,7 +464,44 @@ export class ExecutionService {
         data: { status: 'COMPLETED', actualEndAt: new Date() },
       });
 
+      // Enters the supervisor review queue (docs/FIELD_COMMAND_SPEC.md §25/§44 scenario 5) — one
+      // Approval row per activity, created here on first check-out.
+      await tx.approval.create({
+        data: {
+          clientId: tenant.clientId,
+          campaignId: tenant.campaignId,
+          entityType: 'ACTIVITY_INSTANCE',
+          entityId: activityInstanceId,
+          requestedByUserId: userId,
+          status: 'PENDING',
+        },
+      });
+
       return { checkOut, alreadyCheckedOut: false };
+    });
+  }
+
+  /** Called after a rejected activity's flagged content has been redone (a new photo, an edited
+   * form) — puts it back in the supervisor's queue without requiring a fresh physical check-out,
+   * since the field worker's presence at the location was never in question, only the content a
+   * supervisor flagged. */
+  async resubmit(tenant: TenantContext, activityInstanceId: string, userId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({ where: { id: activityInstanceId } });
+      this.assertOwnership(activity, userId);
+
+      const approval = await tx.approval.findFirst({
+        where: { entityType: 'ACTIVITY_INSTANCE', entityId: activityInstanceId },
+      });
+      if (!approval || approval.status !== 'REJECTED') {
+        throw new BadRequestException('This activity has not been rejected — nothing to resubmit');
+      }
+
+      await tx.activityInstance.update({ where: { id: activityInstanceId }, data: { status: 'COMPLETED' } });
+      return tx.approval.update({
+        where: { id: approval.id },
+        data: { status: 'PENDING', approverUserId: null, decidedAt: null },
+      });
     });
   }
 }

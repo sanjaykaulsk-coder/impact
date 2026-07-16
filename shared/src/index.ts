@@ -417,3 +417,52 @@ export interface UpdateAssignmentRequest {
   userId?: string;
   teamId?: string;
 }
+
+// -- /campaigns/:campaignId/supervisor -----------------------------------------------------------
+// Spec §25/§44 scenario 5: "reviews media and GPS, approves/rejects with remarks." Scoped to that
+// for Session C — not the full supervisor module (team dashboard, live map, exceptions are later).
+export type ApprovalDecisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface SupervisorGpsEvent {
+  latitude: string;
+  longitude: string;
+  deviceTimestamp: string;
+  distanceFromPlannedMeters?: string | null;
+}
+
+export interface SupervisorMediaItem {
+  id: string;
+  url: string;
+  latitude: string | null;
+  longitude: string | null;
+  capturedAt: string | null;
+}
+
+export interface SupervisorFormAnswer {
+  questionLabel: string;
+  valueJson: unknown;
+}
+
+export interface SupervisorInboxItem {
+  approvalId: string;
+  status: ApprovalDecisionStatus;
+  remarks: string | null;
+  decidedAt: string | null;
+  decidedByName: string | null;
+  createdAt: string;
+  activity: {
+    id: string;
+    status: string;
+    locationName: string;
+    assignedUserName: string;
+  };
+  checkIn: SupervisorGpsEvent | null;
+  checkOut: SupervisorGpsEvent | null;
+  media: SupervisorMediaItem[];
+  formResponses: SupervisorFormAnswer[];
+}
+
+export interface DecideApprovalRequest {
+  decision: 'APPROVED' | 'REJECTED';
+  remarks?: string;
+}

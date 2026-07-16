@@ -12,6 +12,7 @@ import { ExecutionModule } from './modules/execution/execution.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
 import { PjpModule } from './modules/pjp/pjp.module';
+import { SupervisorModule } from './modules/supervisor/supervisor.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PjpModule } from './modules/pjp/pjp.module';
     FormsModule,
     HealthModule,
     PjpModule,
+    SupervisorModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

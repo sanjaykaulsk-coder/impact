@@ -1,8 +1,57 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 15 July 2026 · **Phase:** C — approved. **Stage 2 Session A (admin thread) — COMPLETE. Stage 2 Session B (field/phone-app thread) — COMPLETE, awaiting founder approval to start Session C.**
+**Last updated:** 16 July 2026 · **Phase:** C — approved. **Stage 2 Session A — COMPLETE. Stage 2 Session B — COMPLETE, founder-approved. Stage 2 Session C (supervisor thread) — built, awaiting the founder's real-device test loop.**
 
-## Stage 2 Session B — field/phone-app thread (this session, after founder's "proceed" approval)
+## Stage 2 Session C — supervisor thread (this session, after founder approved Session B)
+
+Per `docs/architecture/09-mvp-build-sequence.md`: supervisor inbox → media/GPS review →
+approve/reject with remarks (the session's other listed items — airplane-mode test, acceptance
+scenarios 2 & 3 — were already completed during Session B's real-device testing).
+
+Founder-requested housekeeping done first: added a permanent CLAUDE.md process rule (every feature
+session must list which `docs/architecture/` sections it implemented and flag any deviation
+explicitly — added after Session B's single-shot-upload-vs-approved-chunked-design incident), and
+ran the standing QA grep (clean — no dummy/placeholder data, every `mock` reference correctly
+labeled).
+
+- **A real, pre-existing gap found before writing any Session C code**: Postgres Row-Level
+  Security (the database-level tenant-isolation backstop) only ever covers tables with a `clientId`
+  column; 16 tables — including `Approval`, the exact table this session's feature is built on —
+  have `campaignId` but no `clientId`, so RLS silently never protected them. This predates Session
+  B, going back to the original schema design. Asked the founder directly rather than deciding
+  unilaterally; fixed `Approval` only (migration `20260716115337_approval_client_id`, table had
+  zero rows anywhere so no backfill needed), logged the other 15 as a known gap for a dedicated
+  future pass — see A-043.
+- **Backend** (`backend/src/modules/supervisor/`): a new `Approval` row is created automatically on
+  first check-out (spec §25/§44 scenario 5's review queue). Supervisor inbox lists pending/approved/
+  rejected activities for the campaign; each includes the watermarked photo(s) via signed URL, GPS
+  check-in/check-out with distance-from-planned, and the submitted form's answers. Approve/reject
+  requires remarks on rejection. A new `resubmit` endpoint puts a corrected activity back in the
+  queue without requiring a fresh physical GPS check-out — the worker's presence was never in
+  question on a content-only rejection, only the flagged content itself.
+- **Web admin** (`web/src/app/dashboard/approvals/`): inbox with Pending/Approved/Rejected tabs,
+  a review panel showing the photo, GPS, and form answers side by side, and approve/reject actions.
+  Moved from `NAV_SOON_ITEMS` to `NAV_LIVE_ITEMS` — a real, linked page now.
+- **Flutter app**: a rejection banner shows the supervisor's remarks; the worker can retake the
+  photo or re-edit the form even though the count/submission requirement was already met, then tap
+  "Resubmit for review." Pending-review and approved states are shown too.
+- **Explicitly not built this session** (see A-044 for the full list): the team-wide progress
+  dashboard, live map, exceptions, WhatsApp verification, alerts — all staged later in
+  `docs/architecture/09` (S4/S5), not a silent gap. A full per-decision audit history of approvals
+  isn't built either — one `Approval` row is reused across a reject → resubmit → approve cycle, so
+  only the latest decision's remarks are visible, not a complete trail.
+- **Verified**: `tsc --noEmit` clean (backend), `next build` clean including the new route (web),
+  `flutter analyze`/`build linux`/`test` all clean (app). As with every backend feature built in
+  this sandbox (no Docker/Postgres here), the actual live behavior of the full loop is unverified
+  here — needs the founder's own real-device test, which they explicitly asked to run themselves:
+  their field submission from today appears in the inbox → review the photo with its GPS stamp →
+  reject with a reason → it comes back to the field app for correction → resubmit → supervisor
+  approves. **One extra step needed for that test**: today's already-completed activities
+  (check-in → photo → form → check-out all done during Session B's testing) predate this session's
+  Approval-creation code, so they won't automatically be in the inbox — see "How to see it
+  yourself" below for the one-line fix.
+
+## Stage 2 Session B — field/phone-app thread (previous session, after founder's "proceed" approval)
 
 Per `docs/architecture/09-mvp-build-sequence.md`: assignment list → activity detail → camera-only
 opening evidence with GPS/timestamp/overlay → check-in validation → milestone form → offline
@@ -224,8 +273,8 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 ## Open items for the founder
 1. Full visit end-to-end — **DONE**, confirmed synced on your phone
 2. Airplane-mode test (offline queueing + reconnect sync) — **DONE**, confirmed on your phone: offline items failed cleanly and visibly, reconnecting synced everything automatically
-3. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
-4. Decide how you'd like to see it running — two options, see below
+3. Session B (field thread) — **approved**
+4. **Session C (supervisor thread) — built, waiting on your full test loop**: your field submission from today appears in the inbox → you review the photo with its GPS stamp → reject with a reason → it comes back to your field app for correction → you resubmit → supervisor approves. One-time SQL step needed first — see "How to see it yourself" below.
 5. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 
 ## How to see it yourself
@@ -243,6 +292,40 @@ one assignment (Patna City Haat Ground) you can walk through end to end: tap the
 in (grants camera + location permission when asked), take the opening photo, fill in the milestone
 form, and check out. This is the first point in the build where camera and GPS can be confirmed for
 real, since neither exists on this build machine.
+
+### Testing Session C — the full reject → correct → resubmit → approve loop
+
+**One-time step first.** The two visits you already completed on your phone during Session B's
+testing (Patna City Haat Ground, Danapur Cantt Market) finished check-out before this session's
+"create an Approval on check-out" code existed, so they have no review-queue entry yet. Run this
+once against your own database (e.g. `docker exec -it <postgres-container> psql -U postgres -d
+field_command`) to backfill them — it only touches your two already-completed visits, nothing else:
+
+```sql
+INSERT INTO approvals (id, "clientId", "campaignId", "entityType", "entityId", "requestedByUserId", status, "createdAt", "updatedAt")
+SELECT gen_random_uuid(), ai."clientId", ai."campaignId", 'ACTIVITY_INSTANCE', ai.id, ai."assignedUserId", 'PENDING', now(), now()
+FROM activity_instances ai
+WHERE ai.status = 'COMPLETED'
+  AND NOT EXISTS (
+    SELECT 1 FROM approvals a WHERE a."entityType" = 'ACTIVITY_INSTANCE' AND a."entityId" = ai.id
+  );
+```
+
+Then, after pulling this branch and rebuilding both the backend (`./scripts/bootstrap.sh` picks up
+the new migration automatically) and the Flutter app:
+
+1. **Web admin, as a supervisor**: log in at http://localhost:3000 with Arjun Verma's number
+   (`9000000007`), open the new **Approvals** page in the sidebar. Your Patna City Haat Ground visit
+   should be sitting in the Pending tab — click it to see the photo (with its GPS stamp) and the
+   milestone form answers side by side.
+2. **Reject it**: type a reason in the remarks box (required for rejection) and tap Reject.
+3. **Field app, on your phone**: open the same assignment — you should see a rejection banner with
+   your remarks, and the photo/form buttons active again even though you'd already completed them.
+   Retake the photo (or re-edit the form), then tap **Resubmit for review**.
+4. **Web admin again**: refresh the Approvals inbox — the activity should be back in Pending with
+   your new photo/answers. Approve it this time (no remarks required).
+
+That's the full loop the spec's acceptance scenarios 2 & 3 describe, on your own two devices.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

@@ -114,4 +114,11 @@ class ExecutionRepository {
       'deviceTimestamp': deviceTimestamp.toIso8601String(),
     });
   }
+
+  /// Puts a rejected activity back in the supervisor's queue after its flagged content has been
+  /// redone. Called directly (not via the offline outbox) — seeing the rejection in the first
+  /// place already required connectivity, and this is a lightweight follow-up action.
+  Future<void> resubmit(String campaignId, String activityInstanceId) async {
+    await api.post('/campaigns/$campaignId/activity-instances/$activityInstanceId/resubmit', const {});
+  }
 }

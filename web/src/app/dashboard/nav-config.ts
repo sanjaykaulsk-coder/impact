@@ -19,11 +19,11 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Forms', requiredPermission: 'manage_forms', href: '/dashboard/forms' },
   { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },
   { label: 'Assignments', requiredPermission: 'allocate', href: '/dashboard/assignments' },
+  { label: 'Approvals', requiredPermission: 'approve', href: '/dashboard/approvals' },
 ];
 
 export const NAV_SOON_ITEMS: NavItem[] = [
   { label: 'User Management', requiredPermission: 'manage_users' },
-  { label: 'Approvals', requiredPermission: 'approve' },
   { label: 'Reports & Dashboards', requiredPermission: 'view_reports' },
   { label: 'Device Risk', requiredPermission: 'block' },
   { label: 'Audit Logs', requiredPermission: 'audit' },

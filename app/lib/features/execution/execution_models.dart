@@ -205,6 +205,19 @@ class MediaRecord {
       MediaRecord(id: json['id'] as String, sha256Hash: json['sha256Hash'] as String);
 }
 
+// The supervisor's decision on this activity (spec §25/§44 scenario 5), if any check-out has
+// happened yet. One row reused across reject -> resubmit -> approve cycles — see
+// ExecutionService.resubmit on the backend.
+class ActivityApproval {
+  final String status; // PENDING | APPROVED | REJECTED
+  final String? remarks;
+
+  ActivityApproval({required this.status, this.remarks});
+
+  factory ActivityApproval.fromJson(Map<String, dynamic> json) =>
+      ActivityApproval(status: json['status'] as String, remarks: json['remarks'] as String?);
+}
+
 class ActivityBundle {
   final ActivityInstance activity;
   final Milestone? milestone;
@@ -212,6 +225,7 @@ class ActivityBundle {
   final bool hasCheckOut;
   final List<MediaRecord> media;
   final bool hasFormResponse;
+  final ActivityApproval? approval;
 
   ActivityBundle({
     required this.activity,
@@ -220,6 +234,7 @@ class ActivityBundle {
     required this.hasCheckOut,
     required this.media,
     required this.hasFormResponse,
+    this.approval,
   });
 
   factory ActivityBundle.fromJson(Map<String, dynamic> json) => ActivityBundle(
@@ -229,6 +244,7 @@ class ActivityBundle {
         hasCheckOut: json['checkOut'] != null,
         media: (json['media'] as List<dynamic>? ?? []).map((m) => MediaRecord.fromJson(m as Map<String, dynamic>)).toList(),
         hasFormResponse: json['formResponse'] != null,
+        approval: json['approval'] != null ? ActivityApproval.fromJson(json['approval'] as Map<String, dynamic>) : null,
       );
 }
 

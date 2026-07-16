@@ -1,4 +1,5 @@
 import type {
+  ApprovalDecisionStatus,
   AssignmentSummary,
   AvailableAssignmentUser,
   AvailablePjpRow,
@@ -11,6 +12,7 @@ import type {
   CreateFormTemplateRequest,
   CreatePjpRequest,
   CreatePjpResponse,
+  DecideApprovalRequest,
   FormTemplateDetail,
   FormTemplateSummary,
   MeResponse,
@@ -20,6 +22,7 @@ import type {
   PjpRowInput,
   PjpSummary,
   RequestOtpResponse,
+  SupervisorInboxItem,
   TokenPair,
   UpdateAssignmentRequest,
   UpdateCampaignRequest,
@@ -206,6 +209,15 @@ export const api = {
     update: (campaignId: string, assignmentId: string, dto: UpdateAssignmentRequest) =>
       request<AssignmentSummary>(`/campaigns/${campaignId}/assignments/${assignmentId}`, {
         method: 'PATCH',
+        body: JSON.stringify(dto),
+      }),
+  },
+  supervisor: {
+    inbox: (campaignId: string, status: ApprovalDecisionStatus = 'PENDING') =>
+      request<SupervisorInboxItem[]>(`/campaigns/${campaignId}/supervisor/inbox?status=${status}`),
+    decide: (campaignId: string, approvalId: string, dto: DecideApprovalRequest) =>
+      request<SupervisorInboxItem>(`/campaigns/${campaignId}/supervisor/approvals/${approvalId}/decide`, {
+        method: 'POST',
         body: JSON.stringify(dto),
       }),
   },

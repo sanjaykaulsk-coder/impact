@@ -135,4 +135,15 @@ export class ExecutionController {
   ) {
     return this.execution.checkOut(tenant, activityInstanceId, user.id, dto);
   }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/resubmit')
+  resubmit(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.execution.resubmit(tenant, activityInstanceId, user.id);
+  }
 }

@@ -115,6 +115,21 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
+  /// After a rejected activity's flagged content has been redone (a new photo, an edited form),
+  /// this puts it back in the supervisor's queue. A direct online call, not routed through the
+  /// offline outbox — seeing the rejection at all already required connectivity.
+  Future<void> _resubmit() async {
+    setState(() => _actionInProgress = true);
+    try {
+      await ref.read(executionRepositoryProvider).resubmit(_campaignId, _bundle!.activity.id);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not resubmit: $e')));
+    } finally {
+      if (mounted) setState(() => _actionInProgress = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,6 +168,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         final canCheckOut =
             !hasCheckOut && (!needsGps || hasCheckIn) && photoCount >= requiredPhotos && (!needsForm || hasFormResponse);
 
+        final approvalStatus = bundle.approval?.status;
+        final isRejected = approvalStatus == 'REJECTED';
+        final isPendingReview = hasCheckOut && approvalStatus == 'PENDING';
+        final isApproved = approvalStatus == 'APPROVED';
+
         return RefreshIndicator(
           onRefresh: _load,
           child: ListView(
@@ -162,6 +182,44 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
               const SizedBox(height: 4),
               Text('Status: ${bundle.activity.status}', style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 16),
+
+              if (isRejected)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.red.shade200)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade700),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Sent back by your supervisor', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900)),
+                            const SizedBox(height: 4),
+                            Text(bundle.approval?.remarks ?? 'No reason given.', style: TextStyle(color: Colors.red.shade900)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (isPendingReview)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.shade200)),
+                  child: Text('Waiting for your supervisor to review this visit.', style: TextStyle(color: Colors.amber.shade900)),
+                ),
+              if (isApproved)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade200)),
+                  child: Text('Approved by your supervisor.', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
+                ),
 
               _RequirementTile(
                 icon: Icons.my_location,
@@ -186,7 +244,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   icon: const Icon(Icons.my_location),
                   label: const Text('Check in'),
                 ),
-              if (hasCheckIn && photoCount < requiredPhotos)
+              if (hasCheckIn && (photoCount < requiredPhotos || isRejected))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: ElevatedButton.icon(
@@ -200,10 +258,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             await _load();
                           },
                     icon: const Icon(Icons.camera_alt),
-                    label: const Text('Take opening photo'),
+                    label: Text(isRejected ? 'Retake opening photo' : 'Take opening photo'),
                   ),
                 ),
-              if (hasCheckIn && needsForm && !hasFormResponse)
+              if (hasCheckIn && needsForm && (!hasFormResponse || isRejected))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: ElevatedButton.icon(
@@ -221,7 +279,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             await _load();
                           },
                     icon: const Icon(Icons.assignment),
-                    label: const Text('Fill outlet form'),
+                    label: Text(isRejected ? 'Edit outlet form' : 'Fill outlet form'),
                   ),
                 ),
               if (canCheckOut)
@@ -233,7 +291,16 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     label: const Text('Check out — complete activity'),
                   ),
                 ),
-              if (hasCheckOut)
+              if (isRejected)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: ElevatedButton.icon(
+                    onPressed: _actionInProgress ? null : _resubmit,
+                    icon: const Icon(Icons.send),
+                    label: const Text('Resubmit for review'),
+                  ),
+                ),
+              if (hasCheckOut && !isRejected && !isPendingReview && !isApproved)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text('Activity completed.', style: TextStyle(fontWeight: FontWeight.bold)),
