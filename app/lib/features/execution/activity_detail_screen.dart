@@ -293,19 +293,31 @@ class _RequirementTile extends StatelessWidget {
 /// real-device testing surfaced `ClientException with SocketException errno 103` on screen) — the
 /// sync log's default view is a plain bilingual message; the technical detail stays available
 /// behind a tap for support/diagnosis, never as the primary text.
+// Bilingual (Hindi + English) subject noun for whatever actually failed — "Photo upload paused"
+// read wrong for a failed form submission when this used to be one fixed string regardless of
+// item type (found from a real screenshot during the founder's airplane-mode test).
+(String hi, String en) _subjectFor(String type) => switch (type) {
+      'media' => ('फोटो अपलोड', 'Photo upload'),
+      'milestoneResponse' => ('फॉर्म भेजना', 'Form submission'),
+      'checkIn' => ('चेक-इन भेजना', 'Check-in'),
+      'checkOut' => ('चेक-आउट भेजना', 'Check-out'),
+      _ => ('सिंक', 'Sync'),
+    };
+
 String _friendlyErrorMessage(OutboxItem item) {
   final raw = item.errorMessage?.toLowerCase() ?? '';
+  final (subjectHi, subjectEn) = _subjectFor(item.type);
   if (raw.contains('socketexception') || raw.contains('connection abort') || raw.contains('network changed')) {
-    return 'फोटो अपलोड रुक गया — अपने आप दोबारा कोशिश होगी। सलाह: वाई-फाई पर रहें।\n'
-        'Photo upload paused — will retry automatically. Tip: stay on Wi-Fi.';
+    return '$subjectHi रुक गया — अपने आप दोबारा कोशिश होगी। सलाह: वाई-फाई पर रहें।\n'
+        '$subjectEn paused — will retry automatically. Tip: stay on Wi-Fi.';
   }
   if (raw.contains('timeoutexception') || raw.contains('timed out')) {
-    return 'अपलोड में देर हो रही है — दोबारा कोशिश होगी।\nThis is taking longer than expected — will retry automatically.';
+    return '$subjectHi में देर हो रही है — दोबारा कोशिश होगी।\n$subjectEn is taking longer than expected — will retry automatically.';
   }
   if (item.type == 'checkOut' && raw.contains('photo')) {
     return 'फोटो अपलोड होने का इंतज़ार है।\nWaiting for the photo to finish uploading first.';
   }
-  return 'सिंक नहीं हो सका — दोबारा कोशिश होगी।\nCouldn\'t sync this — will retry automatically.';
+  return '$subjectHi सिंक नहीं हो सका — दोबारा कोशिश होगी।\n$subjectEn couldn\'t sync — will retry automatically.';
 }
 
 class _OutboxStatusTile extends StatefulWidget {

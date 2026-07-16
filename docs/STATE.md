@@ -105,12 +105,25 @@ that would corrupt Prisma's migration checksum tracking. Logged here in full rat
 folded into #7, because getting this wrong is exactly the kind of mistake this file exists to make
 visible, not hide.
 
-**CONFIRMED on the founder's real device**: the founder re-ran the full visit end-to-end after all
-of the above (A-033 through A-041) — login, check-in, chunked photo upload, milestone form, and
-check-out all completed and every item showed `synced`. This is the first genuine real-device,
-real-network, real-Wi-Fi confirmation this feature set has had. The airplane-mode test (offline
-queueing + reconnect sync, the other half of the founder's planned retest) is still outstanding —
-see "Next" below.
+**CONFIRMED on the founder's real device — both halves of the planned retest now pass**:
+- Full visit end-to-end: login, check-in, chunked photo upload, milestone form, and check-out all
+  completed and every item showed `synced`.
+- **Airplane-mode test**: checked in, then went offline. Photo and form attempts correctly showed
+  `failed` with a clear bilingual message and a working "Retake" option — nothing hung, crashed, or
+  silently lost data. Reconnecting Wi-Fi triggered automatic sync of everything queued, with no
+  action needed, ending in check-out becoming available and completing. This is the core promise
+  of the offline-first design (docs/architecture/05), genuinely confirmed on real hardware over a
+  real network, not just reasoned about.
+
+One more real bug found and fixed during this test (A-042): the activity screen re-fetches from
+the server after every action to pick up server-side changes, and while genuinely offline that
+fetch is *expected* to fail — but the screen was treating any failure as blocking, wiping out all
+visible progress (check-in done, photo just queued) the moment it went offline. Fixed to only block
+on the true first load; a failed background refresh now just keeps showing what's already known,
+with a small dismissible notice instead of blanking the screen. Also fixed a minor mislabeled-error
+bug the founder's own screenshot caught: a failed form submission was showing "Photo upload
+paused" (copied from the photo item's message) instead of wording appropriate to what actually
+failed.
 
 ## Stage 2 Session A — admin thread (previous session, after Phase C approval)
 
@@ -155,7 +168,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - Monorepo scaffold: `backend/` (NestJS), `web/` (Next.js), `app/` (Flutter), `shared/` (TS API types), `docs/`
 - Phase A docs carried over: `CLAUDE.md`, `README.md`, `docs/FIELD_COMMAND_SPEC.md`, **full architecture pack 01–09** (01/03/04/06/09 were missing at Phase C's start per A-011 — recovered mid-session from the founder's Phase A zip export and added; the gap logged in A-011 is now closed)
 - `docs/reference/`: `Type_of_Campaign.xlsx` (21 real historical campaign-report sheets — DFR, Profile, Stock Reconciliation, Enquiry formats; contains real contact numbers and client sales figures, kept per the founder's explicit confirmation it's Impact's own proprietary data), `Type_of_Campaign_formats.md` (the founder's own PII-masked structural conversion of the same workbook, covering all 21 sheets), and `report-format-library.md` (Claude's distillation — see A-023 — cross-checked against the founder's structural conversion, which confirmed every finding and added real production-scale evidence: 27,032 real rows in one sheet alone. The founder's original *directives* document of the same name still hasn't successfully uploaded after three attempts)
-- `docs/ASSUMPTIONS.md`: 41 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
+- `docs/ASSUMPTIONS.md`: 42 logged entries — practical assumptions, two known data-model limitations, and every bug found/fixed during build with full context (see "Bugs found and fixed" below)
 - App branding: the founder's logo integrated into both the web admin (favicon, login header, sidebar) and the Flutter app (Android launcher icons, login header) — verified visually on both
 
 **Infrastructure**
@@ -210,10 +223,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 
 ## Open items for the founder
 1. Full visit end-to-end — **DONE**, confirmed synced on your phone
-2. Airplane-mode test (offline queueing + reconnect sync) — still to run when you're ready
+2. Airplane-mode test (offline queueing + reconnect sync) — **DONE**, confirmed on your phone: offline items failed cleanly and visibly, reconnecting synced everything automatically
 3. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
 4. Decide how you'd like to see it running — two options, see below
-4. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+5. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 
 ## How to see it yourself
 
