@@ -31,6 +31,7 @@ No test value, dummy balance, placeholder text, or mock data reachable on any sc
 2. No superficial demo; no big-bang build. Vertical slice first, then module by module per `docs/architecture/09-mvp-build-sequence.md`.
 3. Form versioning and immutable audit logs are day-one architecture, not polish.
 4. Where Android cannot technically guarantee something (e.g. absolute manipulation prevention), say so plainly and implement the spec's risk-detection approach.
+5. Every feature session must end by listing which sections of `docs/architecture/` it implemented, and flag any deviation from the approved design explicitly. Silently substituting a simpler approach (as happened with the single-shot upload vs the approved chunked design) is a process violation.
 
 ## Repo layout
 ```
