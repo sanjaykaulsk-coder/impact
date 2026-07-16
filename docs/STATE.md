@@ -105,11 +105,12 @@ that would corrupt Prisma's migration checksum tracking. Logged here in full rat
 folded into #7, because getting this wrong is exactly the kind of mistake this file exists to make
 visible, not hide.
 
-**Still open, needs the founder's next real-device test to confirm**: the actual root cause of the
-original Wi-Fi connection drops (A-037/A-039) is not fully confirmed — the fixes make it *recover*
-correctly (resumable chunks, bounded timeouts, backoff) rather than claim to have eliminated
-whatever was causing the drops in the first place. The founder's planned retest — full visit +
-airplane-mode test — is exactly the right way to confirm this.
+**CONFIRMED on the founder's real device**: the founder re-ran the full visit end-to-end after all
+of the above (A-033 through A-041) — login, check-in, chunked photo upload, milestone form, and
+check-out all completed and every item showed `synced`. This is the first genuine real-device,
+real-network, real-Wi-Fi confirmation this feature set has had. The airplane-mode test (offline
+queueing + reconnect sync, the other half of the founder's planned retest) is still outstanding —
+see "Next" below.
 
 ## Stage 2 Session A — admin thread (previous session, after Phase C approval)
 
@@ -208,12 +209,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023.
 
 ## Open items for the founder
-1. Retest on your phone per your plan: full visit end-to-end, plus the airplane-mode test — this
-   directly confirms the three fixes above (A-038/A-039/A-040) and, more importantly, whether the
-   underlying Wi-Fi connection drops are actually resolved, which can only be confirmed on a real
-   device with real network conditions
-2. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
-3. Decide how you'd like to see it running — two options, see below
+1. Full visit end-to-end — **DONE**, confirmed synced on your phone
+2. Airplane-mode test (offline queueing + reconnect sync) — still to run when you're ready
+3. Approve Session B (field thread), or request changes, before Session C (supervisor thread) starts
+4. Decide how you'd like to see it running — two options, see below
 4. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 
 ## How to see it yourself
