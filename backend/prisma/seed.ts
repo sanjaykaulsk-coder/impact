@@ -447,6 +447,20 @@ async function main() {
     },
   });
   await prisma.location.upsert({
+    where: { id: geoDeterministicId('LOCATION', 'Danapur Cantt Market') },
+    update: {},
+    create: {
+      id: geoDeterministicId('LOCATION', 'Danapur Cantt Market'),
+      clientId: shakti.id,
+      campaignId: campaignBihar.id,
+      geographyId: biharGeo.tehsil.id,
+      name: 'Danapur Cantt Market',
+      latitude: 25.632519,
+      longitude: 85.045538,
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.location.upsert({
     where: { id: geoDeterministicId('LOCATION', 'Lucknow Haat Market') },
     update: {},
     create: {
