@@ -586,8 +586,10 @@ async function main() {
 
   // -- Field-thread minimal workflow (Stage 2 Session B) --------------------------------------
   // One real published form, one workflow with a single milestone requiring a photo + GPS, and
-  // one PJP row + assignment, so the field app has a genuine end-to-end thread to run without the
-  // founder hand-configuring anything first. Deliberately NOT the general-purpose workflow/
+  // two PJP rows + assignments (two stops on the same route), so the field app has a genuine
+  // end-to-end thread to run — including a second stop for a fresh airplane-mode/offline test
+  // without needing to reset an already-completed one — without the founder hand-configuring
+  // anything first. Deliberately NOT the general-purpose workflow/
   // milestone builder — that stays Stage 3.2 scope, same spirit as A-024's form-builder decision.
   const patnaHaatLocationId = geoDeterministicId('LOCATION', 'Patna City Haat Ground');
 
@@ -752,6 +754,43 @@ async function main() {
       clientId: shakti.id,
       userId: rahul.id,
       pjpRowId: vanPjpRow.id,
+      assignedById: rohan.id,
+      assignmentDate: new Date(),
+      status: 'ASSIGNED',
+    },
+  });
+
+  // A second stop on the same route — real field days visit more than one location, and a real
+  // second assignment (not a reset of the first) is what let the founder run the airplane-mode
+  // test without touching the already-completed Patna City Haat Ground activity.
+  const danapurLocationId = geoDeterministicId('LOCATION', 'Danapur Cantt Market');
+  const danapurPjpRow = await prisma.pJPRow.upsert({
+    where: { id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Danapur Cantt Market') },
+    update: {},
+    create: {
+      id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Danapur Cantt Market'),
+      pjpId: vanPjp.id,
+      campaignId: campaignBihar.id,
+      date: new Date(),
+      stateName: 'Bihar',
+      districtName: 'Patna',
+      tehsilName: 'Danapur',
+      locationName: 'Danapur Cantt Market',
+      locationId: danapurLocationId,
+      latitude: 25.632519,
+      longitude: 85.045538,
+      status: 'ACTIVE',
+    },
+  });
+  await prisma.userAssignment.upsert({
+    where: { id: geoDeterministicId('ASSIGNMENT', 'Rahul Bihar Van Seed Danapur') },
+    update: {},
+    create: {
+      id: geoDeterministicId('ASSIGNMENT', 'Rahul Bihar Van Seed Danapur'),
+      campaignId: campaignBihar.id,
+      clientId: shakti.id,
+      userId: rahul.id,
+      pjpRowId: danapurPjpRow.id,
       assignedById: rohan.id,
       assignmentDate: new Date(),
       status: 'ASSIGNED',
