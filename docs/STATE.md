@@ -298,8 +298,8 @@ real, since neither exists on this build machine.
 **One-time step first.** The two visits you already completed on your phone during Session B's
 testing (Patna City Haat Ground, Danapur Cantt Market) finished check-out before this session's
 "create an Approval on check-out" code existed, so they have no review-queue entry yet. Run this
-once against your own database (e.g. `docker exec -it <postgres-container> psql -U postgres -d
-field_command`) to backfill them — it only touches your two already-completed visits, nothing else:
+once against your own database (`docker exec -i impact-field-command-postgres-1 psql -U impact -d
+impact_field_command`) to backfill them — it only touches your two already-completed visits, nothing else:
 
 ```sql
 INSERT INTO approvals (id, "clientId", "campaignId", "entityType", "entityId", "requestedByUserId", status, "createdAt", "updatedAt")
