@@ -1,8 +1,71 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 17 July 2026 · **Phase:** C — approved. **Stage 2 Sessions A, B, C — ALL COMPLETE and founder-confirmed on real devices. The full vertical slice (admin → field execution → supervisor review) is done.** Next: Stage 3 (configuration depth) — awaiting the founder's written go-ahead.
+**Last updated:** 17 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (dynamic form builder full + Campaign SKU Master + DFR/reconciliation reporting) — built, gate test passing, awaiting founder review before S3.2.**
 
-## Stage 2 Session C — supervisor thread (this session, after founder approved Session B)
+## Stage 3.1 — dynamic form builder full, Campaign SKU Master, DFR/reconciliation reporting (this session, after founder approved Stage 3 start)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S3.1 and `docs/reference/report-format-library.md`
+in full — the scope explicitly listed for this stage: the full 35+ field-type form builder, the
+Campaign SKU Master with movement types, record-level (Profile) capture with auto-computed DFR
+aggregates, the four report-format archetypes as builder presets, and the §5 migration acceptance
+test as the stage's completion gate.
+
+- **A capability change worth noting**: this build container turns out to have PostgreSQL 16
+  installed, so for the first time a real, fully-migrated Postgres ran inside the sandbox itself —
+  all 9 migrations applied cleanly, the seed script ran, and the acceptance test below exercised
+  genuine Row-Level Security through the same restricted `field_command_app` role production uses,
+  not just `tsc --noEmit`. Docker/MinIO/Redis are still absent here, so the media pipeline and
+  queue behavior remain founder-machine-only, same as every prior session.
+- **Backend**: `CampaignSku` + `SkuMovement` (migration `20260717074734_campaign_sku_master`, RLS
+  wired in from day one — the block was copied from the current correct source per A-041's lesson,
+  and verified live, not just by inspection); a new `SkusModule` for SKU CRUD; `archetypes.ts`
+  building the DFR/Profile/Stock-Reconciliation/Enquiry-Leads presets as real question trees bound
+  to the campaign's active SKUs; `ExecutionService` now writes a `SkuMovement` row for every
+  SKU-bound answer at submission time and raises an `Exception` immediately if a reported physical
+  closing stock count disagrees with spec §22's formula; `ReportsModule` serves the DFR as a true
+  rollup query (never a typed total) and the stock reconciliation view.
+- **Web admin**: the Forms builder now offers the full field-type palette (grouped), per-field
+  controls (min/max, character limit, photo count, video duration), regex validation with a
+  message, and multiple conditional rules (previously one). New "Start from" archetype picker on
+  form creation, and a "Sync SKU fields" action that rebuilds only a draft's SKU-bound sections
+  after the SKU Master changes — published versions are never touched. New **SKU Master** page
+  (create/edit/deactivate) and new **Reports** page (DFR + Stock Reconciliation tables, read-only,
+  date-range filtered).
+- **Flutter app**: the milestone form renderer now covers the full palette the web builder can
+  produce — every text/number/date/choice/rating/identity-block type renders a real input;
+  AUTO_CALCULATED fields show a live client-side preview of the SKU total they'll compute to.
+  Media/signature/document types still route through the dedicated camera-only evidence flow
+  rather than a second, weaker inline capture path — shown as an honest note, not a crash.
+- **Migration acceptance test** (`backend/test/acceptance/report-format-library.spec.ts`, gate for
+  this stage per report-format-library §5): **7/7 passing**, run twice consecutively against the
+  real local Postgres with zero database residue after cleanup (the suite deletes every fixture it
+  creates, honoring the standing QA rule even for its own test data). Covers: structural fidelity
+  for 3 representative campaign types (Van/DFR+Profile, Mela stall/Stock-Recon, Retail
+  Audit+Enquiry); DFR aggregate correctness to the cent (integer-cents comparison, not float
+  equality, so a one-ulp drift can't silently pass); the §22 reconciliation formula plus the
+  mismatch-raises-an-Exception behavior; a published `FormVersion`'s exact question set proven
+  unchanged after a mid-campaign SKU addition and draft sync; and cross-tenant reads of the new
+  SKU/movement tables returning zero rows through the real restricted database role.
+- **Explicitly not built this session** (staged later per `docs/architecture/09`, not silent
+  gaps): a workflow-builder UI to attach a new archetype form to a field milestone (S3.2 — so
+  nothing built here is reachable from the phone yet; the acceptance test wires milestones at the
+  service level only); the activity template library (S3.3); PJP management depth (S3.4); the
+  sales/stock module's own UI on top of these tables (S4.3); Excel export in the workbook's layout
+  (S5.4). See A-046/A-047 in `docs/ASSUMPTIONS.md` for the full design-decision and
+  architecture-section accounting, including several practical assumptions logged per process
+  rule 1 (e.g. how a quantity+amount pair becomes two additive movement rows, why SKU management
+  shares the `manage_forms` permission).
+- **Verified**: backend `tsc --noEmit` clean; web `next build` clean (new `/dashboard/skus` and
+  `/dashboard/reports` routes, extended `/dashboard/forms`); Flutter `analyze` 0 issues, `test` all
+  passing, `build linux` clean; acceptance suite 7/7 green. **Nothing in this stage has a
+  founder-facing UI path to test on a real phone yet** — S3.2's workflow builder is what makes a
+  new archetype form assignable to a milestone. What the founder CAN see today: log into the web
+  admin, add SKUs under the new **SKU Master** page for the Bihar campaign (four demo SKUs are
+  seeded — clearly a fictional Shakti product list, per the spec's Demo Data section), create a
+  form from one of the four archetypes under **Forms** and see the generated question tree, and
+  view the (currently empty, since no new data has been captured against it) **Reports** page.
+
+## Stage 2 Session C — supervisor thread (previous session, after founder approved Session B)
 
 Per `docs/architecture/09-mvp-build-sequence.md`: supervisor inbox → media/GPS review →
 approve/reject with remarks (the session's other listed items — airplane-mode test, acceptance
@@ -265,19 +328,18 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - **A-012 / A-021**: this build container has no Android emulator (no hardware virtualization) and cannot build an Android APK (its network policy blocks the Android SDK's own download host) — both are properties of this one container, not of the app. The Flutter app was instead verified as a real compiled Linux-desktop build driven end-to-end against the real backend. See "How to see it yourself" below for what this means for you.
 - **Camera capture and GPS** (part of Session B): cannot be exercised in this sandbox at all (no camera hardware, no location services). The screens are written and pass static analysis; they need confirming on your own Android phone.
 
-## Next (after founder approval of Session B)
-- **Stage 2 Session C (supervisor thread + hardening)**: supervisor inbox → media/GPS review → approve/reject with remarks → airplane-mode end-to-end test → demo of the spec's acceptance scenarios 2 & 3.
-- After the full vertical slice: Stage 3 configuration depth (full 35+ field-type form builder + Campaign SKU Master — see A-024, workflow builder, activity template library, PJP management depth).
+## Next (after founder review of Stage 3.1)
+- **Stage 3.2**: workflow builder + milestone engine (stages, approvals, SOP checklists, readiness view) — this is what lets a new archetype form actually be attached to a field milestone and reach the phone. Nothing built in S3.1 is phone-testable until this lands.
+- **Stage 3.3**: activity template library as configuration.
+- **Stage 3.4**: PJP management depth (edit/cancel/postpone/reschedule/reassign with change history).
 - Founder decisions still pending from Phase A (spec §08): production OTP provider, cloud region, first shadow-pilot campaign.
-- If the founder's original `report-format-library.md` surfaces later, it should be reconciled against `docs/reference/report-format-library.md` (this session's distillation) before Stage 3.1 starts — see A-023.
+- 15 of the 16 tables missing the RLS `clientId` backstop (A-043) remain a known, logged gap — `Approval` was fixed in Stage 2 Session C; the rest are unscheduled.
 
 ## Open items for the founder
-1. Full visit end-to-end — **DONE**, confirmed synced on your phone
-2. Airplane-mode test (offline queueing + reconnect sync) — **DONE**, confirmed on your phone: offline items failed cleanly and visibly, reconnecting synced everything automatically
-3. Session B (field thread) — **approved**
-4. Session C full test loop (inbox → photo/GPS review → reject with reason → correction on the phone → resubmit → approve, both roles, both devices) — **DONE, confirmed by the founder on 17 July 2026**
-5. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-6. **Approve the start of Stage 3 (configuration depth)** — per process rules, this is a phase boundary; nothing new gets built until written approval
+1. Stage 2 (Sessions A, B, C) — **approved and confirmed on your real devices**
+2. **Stage 3.1 (this session) — built, gate test passing, awaiting your review.** There is nothing to test on your phone yet for this stage specifically (see below for why) — what you can review is the web admin: SKU Master, the form builder's new archetype presets, and the Reports page.
+3. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+4. **Approve Stage 3.1, or request changes, before Stage 3.2 (workflow builder) starts** — per process rules, this is a phase boundary
 
 ## How to see it yourself
 
@@ -328,6 +390,27 @@ the new migration automatically) and the Flutter app:
    your new photo/answers. Approve it this time (no remarks required).
 
 That's the full loop the spec's acceptance scenarios 2 & 3 describe, on your own two devices.
+
+### Reviewing Stage 3.1 — SKU Master, form builder presets, reports
+
+This stage has no new field-app screen — the workflow builder that would attach a new form to an
+actual milestone is Stage 3.2, next. What you can look at today, in the web admin, after pulling
+this branch and re-running `./scripts/bootstrap.sh` (it applies the two new migrations
+automatically):
+
+1. **SKU Master** (new sidebar item): select the Bihar campaign, and you'll see four demo products
+   already seeded (Shakti Herbal Soap, Amla Shampoo, Power Detergent, Gold Tea — clearly fictional,
+   per the spec's Demo Data rules) with MRP/selling price/pack size. Try adding one of your own,
+   editing one, or deactivating one.
+2. **Forms → + New form**: the "Start from" dropdown now offers Profile, DFR, Stock Reconciliation,
+   or Enquiry/Leads, alongside a blank form. Pick "Profile" and it generates a full outlet-visit
+   form with one quantity + one sales-value question per active SKU, plus an auto-calculated total
+   — open it to see the generated question tree, or add a field yourself from the now-full type
+   list (35+ types, grouped in the dropdown).
+3. **Reports**: DFR and Stock Reconciliation tabs, date-range filtered — currently empty for real
+   data since no new capture has happened against this yet (that arrives with Stage 3.2).
+
+There's no SQL step needed for this one — it's additive, new tables only.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

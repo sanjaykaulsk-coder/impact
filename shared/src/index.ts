@@ -182,9 +182,8 @@ export interface UpsertBrandingRequest {
 }
 
 // -- /campaigns/:campaignId/form-templates (minimal form builder) ----------------------------
-// Mirrors the schema's full field-type list (backend/prisma/schema.prisma FieldType); the web
-// builder only offers a curated "core" subset as buttons — the rest, and the Campaign SKU
-// Master, are Stage 3.1 per docs/architecture/09-mvp-build-sequence.md.
+// Mirrors the schema's full field-type list (backend/prisma/schema.prisma FieldType). As of
+// Stage 3.1 the web builder offers the full palette, grouped by category.
 export type FieldType =
   | 'SHORT_TEXT'
   | 'LONG_TEXT'
@@ -212,10 +211,16 @@ export type FieldType =
   | 'AUTO_ACTIVITY_ID'
   | 'AUTO_CAMPAIGN_ID'
   | 'AUTO_LOCATION'
+  | 'AUTO_CALCULATED'
   | 'SKU_SELECTOR'
   | 'QUANTITY'
   | 'MEASUREMENT'
-  | 'SALES_VALUE';
+  | 'SALES_VALUE'
+  | 'STOCK_VALUE'
+  | 'RETAILER_DETAILS'
+  | 'CONSUMER_DETAILS'
+  | 'REMARKS'
+  | 'APPROVAL_STATUS';
 
 export type ConditionalAction = 'SHOW' | 'HIDE' | 'REQUIRE' | 'OPTIONAL';
 export type FormVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -227,6 +232,20 @@ export interface QuestionOptionResponse {
   order: number;
 }
 
+export interface ValidationRuleResponse {
+  id: string;
+  ruleType: string;
+  configJson: Record<string, unknown>;
+}
+
+// A question bound to one Campaign SKU Master row (report-format-library §3): its numeric answer
+// becomes one SkuMovement row at submission time. Lives inside controlsJson under key "skuBinding".
+export interface SkuBinding {
+  campaignSkuId: string;
+  movementType: SkuMovementType;
+  metric: 'QUANTITY' | 'AMOUNT';
+}
+
 export interface FormQuestionResponse {
   id: string;
   fieldType: FieldType;
@@ -235,6 +254,11 @@ export interface FormQuestionResponse {
   order: number;
   isMandatory: boolean;
   options: QuestionOptionResponse[];
+  controlsJson?: Record<string, unknown>;
+  formulaExpression?: string | null;
+  defaultValueJson?: unknown;
+  dependsOnQuestionId?: string | null;
+  validationRules?: ValidationRuleResponse[];
 }
 
 export interface FormSectionResponse {
@@ -261,11 +285,14 @@ export interface FormVersionResponse {
   conditionalRules: ConditionalRuleResponse[];
 }
 
+export type FormArchetype = 'DFR' | 'PROFILE' | 'STOCK_RECONCILIATION' | 'ENQUIRY_LEADS';
+
 export interface FormTemplateSummary {
   id: string;
   name: string;
   code: string;
   description: string | null;
+  archetype?: FormArchetype | null;
   versions: { id: string; version: number; status: FormVersionStatus }[];
 }
 
@@ -274,18 +301,25 @@ export interface FormTemplateDetail {
   name: string;
   code: string;
   description: string | null;
+  archetype?: FormArchetype | null;
   versions: FormVersionResponse[];
 }
 
 export interface CreateFormTemplateRequest {
   name: string;
   description?: string;
+  archetype?: FormArchetype;
 }
 
 export interface UpsertDraftQuestionOption {
   label: string;
   value: string;
   order: number;
+}
+
+export interface UpsertDraftValidationRule {
+  ruleType: string;
+  configJson: Record<string, unknown>;
 }
 
 export interface UpsertDraftQuestion {
@@ -296,6 +330,11 @@ export interface UpsertDraftQuestion {
   order: number;
   isMandatory: boolean;
   options?: UpsertDraftQuestionOption[];
+  controlsJson?: Record<string, unknown>;
+  formulaExpression?: string;
+  defaultValueJson?: unknown;
+  dependsOnQuestionKey?: string;
+  validationRules?: UpsertDraftValidationRule[];
 }
 
 export interface UpsertDraftSection {
@@ -465,4 +504,81 @@ export interface SupervisorInboxItem {
 export interface DecideApprovalRequest {
   decision: 'APPROVED' | 'REJECTED';
   remarks?: string;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Stage 3.1 — Campaign SKU Master + reports (report-format-library §§1-3)
+// ---------------------------------------------------------------------------------------------
+
+export type SkuMovementType =
+  | 'OPENING_STOCK'
+  | 'RECEIVED'
+  | 'SOLD'
+  | 'FREE_SCHEME'
+  | 'SAMPLED'
+  | 'DAMAGED'
+  | 'CLOSING_STOCK_ACTUAL';
+
+export interface CampaignSkuResponse {
+  id: string;
+  skuCode: string;
+  name: string;
+  variantLabel: string | null;
+  category: string | null;
+  mrp: string | number | null;
+  sellingPrice: string | number | null;
+  packSize: string | null;
+  isActive: boolean;
+}
+
+export interface UpsertCampaignSkuRequest {
+  skuCode?: string;
+  name?: string;
+  variantLabel?: string;
+  category?: string;
+  mrp?: number;
+  sellingPrice?: number;
+  packSize?: string;
+  isActive?: boolean;
+}
+
+export interface DfrReportSku {
+  id: string;
+  skuCode: string;
+  name: string;
+  variantLabel: string | null;
+  category: string | null;
+  isActive: boolean;
+}
+
+export interface DfrReportRow {
+  date: string;
+  locationId: string | null;
+  locationName: string | null;
+  recordCount: number;
+  cells: Record<string, { quantity: number; amount: number }>;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+export interface DfrReportResponse {
+  skus: DfrReportSku[];
+  rows: DfrReportRow[];
+  grandTotalQuantity: number;
+  grandTotalAmount: number;
+}
+
+export interface StockReconciliationRow {
+  sku: { id: string; skuCode: string; name: string; variantLabel: string | null; isActive: boolean };
+  openingStock: number;
+  received: number;
+  soldQuantity: number;
+  soldAmount: number;
+  freeSchemeQuantity: number;
+  freeSchemeValue: number;
+  sampled: number;
+  damaged: number;
+  expectedClosing: number;
+  actualClosing: number | null;
+  mismatch: number | null;
 }

@@ -74,4 +74,16 @@ export class FormsController {
   ) {
     return this.forms.publish(tenant, templateId);
   }
+
+  // Mid-campaign SKU change: rebuilds only the archetype's SKU-bound sections of the current
+  // draft from the active SKU master. Published versions stay frozen (spec §10).
+  @RequirePermissions('manage_forms')
+  @Post(':templateId/sync-skus')
+  syncSkus(
+    @Param('campaignId') _campaignId: string,
+    @Param('templateId') templateId: string,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return this.forms.syncSkuQuestions(tenant, templateId);
+  }
 }

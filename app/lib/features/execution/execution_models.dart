@@ -79,6 +79,8 @@ class FormQuestion {
   final String? helpText;
   final bool isMandatory;
   final List<QuestionOption> options;
+  final Map<String, dynamic> controlsJson;
+  final String? formulaExpression;
 
   FormQuestion({
     required this.id,
@@ -87,7 +89,13 @@ class FormQuestion {
     this.helpText,
     required this.isMandatory,
     required this.options,
+    this.controlsJson = const {},
+    this.formulaExpression,
   });
+
+  /// The SKU binding placed in controlsJson by the web builder's archetype presets
+  /// (report-format-library §3) — {campaignSkuId, movementType, metric}.
+  Map<String, dynamic>? get skuBinding => controlsJson['skuBinding'] as Map<String, dynamic>?;
 
   factory FormQuestion.fromJson(Map<String, dynamic> json) => FormQuestion(
         id: json['id'] as String,
@@ -98,6 +106,8 @@ class FormQuestion {
         options: (json['options'] as List<dynamic>? ?? [])
             .map((o) => QuestionOption.fromJson(o as Map<String, dynamic>))
             .toList(),
+        controlsJson: (json['controlsJson'] as Map<String, dynamic>?) ?? const {},
+        formulaExpression: json['formulaExpression'] as String?,
       );
 }
 

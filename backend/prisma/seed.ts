@@ -613,6 +613,25 @@ async function main() {
     create: { name: 'Van Campaign', code: 'VAN_CAMPAIGN', description: 'Mobile van outreach with outlet visits' },
   });
 
+  // -- Campaign SKU Master (report-format-library §3) — DEMO seed data, spec's Demo Data section.
+  // Fictional Shakti product list mirroring the workbook's category + variant + MRP shape.
+  const demoSkus = [
+    { skuCode: 'SHK-SOAP-75', name: 'Shakti Herbal Soap', variantLabel: '75g', category: 'Personal Care', mrp: 35, sellingPrice: 32, packSize: '72 Pcs in 1 Case' },
+    { skuCode: 'SHK-SHMP-180', name: 'Shakti Amla Shampoo', variantLabel: '180ml', category: 'Personal Care', mrp: 95, sellingPrice: 90, packSize: '48 Pcs in 1 Case' },
+    { skuCode: 'SHK-DET-1KG', name: 'Shakti Power Detergent', variantLabel: '1kg', category: 'Home Care', mrp: 120, sellingPrice: 112, packSize: '24 Pcs in 1 Case' },
+    { skuCode: 'SHK-TEA-250', name: 'Shakti Gold Tea', variantLabel: '250g', category: 'Beverages', mrp: 140, sellingPrice: 132, packSize: '36 Pcs in 1 Case' },
+  ];
+  for (const sku of demoSkus) {
+    const existingSku = await prisma.campaignSku.findFirst({
+      where: { campaignId: campaignBihar.id, skuCode: sku.skuCode },
+    });
+    if (!existingSku) {
+      await prisma.campaignSku.create({
+        data: { clientId: shakti.id, campaignId: campaignBihar.id, ...sku },
+      });
+    }
+  }
+
   const outletVisitForm = await prisma.formTemplate.upsert({
     where: { code: 'bihar-van-outlet-visit' },
     update: {},

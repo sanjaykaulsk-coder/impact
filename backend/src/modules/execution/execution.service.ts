@@ -8,6 +8,8 @@ import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
 import { InitMediaUploadDto } from './dto/init-media-upload.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
+import { skuBindingOf } from '../forms/archetypes';
+import { expectedClosingStock } from '../reports/formula';
 
 /** Great-circle distance in metres — used to check a field worker's GPS position against the
  * planned location, same tolerance concept as CampaignBranding's deviationToleranceMeters. */
@@ -426,8 +428,101 @@ export class ExecutionService {
         include: { fieldResponses: true },
       });
 
+      await this.extractSkuMovements(tx, tenant, bundle, formResponse);
+
       return formResponse;
     });
+  }
+
+  /**
+   * Normalizes SKU-bound answers into SkuMovement rows (report-format-library §2/§3): each
+   * FieldResponse whose question carries a skuBinding in controlsJson becomes one movement row.
+   * Zero quantities are written too — a visit that sold nothing still counts as a visited outlet
+   * in the DFR rollup's record count. If this submission reports actual closing stock, the spec
+   * §22 reconciliation runs immediately and a mismatch raises an Exception record.
+   */
+  private async extractSkuMovements(
+    tx: Prisma.TransactionClient,
+    tenant: TenantContext,
+    bundle: Awaited<ReturnType<ExecutionService['loadBundle']>>,
+    formResponse: { id: string; submittedAt: Date | null; fieldResponses: { id: string; formQuestionId: string; valueJson: Prisma.JsonValue }[] },
+  ) {
+    const questionsById = new Map(
+      (bundle.milestone?.formVersion?.sections.flatMap((s) => s.questions) ?? []).map((q) => [q.id, q]),
+    );
+
+    // Visit date: the planned PJP date when there is one, else the submission date — the same rule
+    // the DFR rollup groups by, so "one row per team/location/day" stays consistent.
+    const movementDate = bundle.activity.pjpRow?.date ?? formResponse.submittedAt ?? new Date();
+    const closingStockSkuIds = new Set<string>();
+
+    for (const fieldResponse of formResponse.fieldResponses) {
+      const question = questionsById.get(fieldResponse.formQuestionId);
+      if (!question) continue;
+      const binding = skuBindingOf(question.controlsJson);
+      if (!binding) continue;
+
+      const raw = fieldResponse.valueJson;
+      const value = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isNaN(value)) continue;
+
+      await tx.skuMovement.create({
+        data: {
+          clientId: tenant.clientId,
+          campaignId: tenant.campaignId,
+          campaignSkuId: binding.campaignSkuId,
+          formResponseId: formResponse.id,
+          fieldResponseId: fieldResponse.id,
+          locationId: bundle.activity.locationId,
+          movementType: binding.movementType,
+          movementDate,
+          quantity: binding.metric === 'QUANTITY' ? value : 0,
+          amount: binding.metric === 'AMOUNT' ? value : null,
+        },
+      });
+      if (binding.movementType === 'CLOSING_STOCK_ACTUAL') closingStockSkuIds.add(binding.campaignSkuId);
+    }
+
+    // Reconcile at the moment actual closing stock is reported (spec §22): Opening + Received −
+    // Sold − Sampled − Damaged = Expected Closing; any difference from the physical count becomes
+    // an Exception record for the supervisor queue (full exception lifecycle is Stage 5.2).
+    for (const campaignSkuId of closingStockSkuIds) {
+      const sums = await tx.skuMovement.groupBy({
+        by: ['movementType'],
+        where: { campaignId: tenant.campaignId, campaignSkuId },
+        _sum: { quantity: true },
+      });
+      const totals = Object.fromEntries(sums.map((s) => [s.movementType, Number(s._sum.quantity ?? 0)]));
+      const expected = expectedClosingStock({
+        opening: totals.OPENING_STOCK ?? 0,
+        received: totals.RECEIVED ?? 0,
+        sold: totals.SOLD ?? 0,
+        sampled: totals.SAMPLED ?? 0,
+        damaged: totals.DAMAGED ?? 0,
+      });
+      const actual = totals.CLOSING_STOCK_ACTUAL ?? 0;
+      if (actual !== expected) {
+        await tx.exception.create({
+          data: {
+            campaignId: tenant.campaignId,
+            category: 'STOCK_MISMATCH',
+            severity: 'HIGH',
+            triggerType: 'STOCK_RECONCILIATION',
+            activityInstanceId: bundle.activity.id,
+            userId: bundle.activity.assignedUserId,
+            locationId: bundle.activity.locationId,
+            evidenceJson: {
+              campaignSkuId,
+              expectedClosing: expected,
+              actualClosing: actual,
+              difference: actual - expected,
+              formResponseId: formResponse.id,
+            },
+            remarks: `Stock mismatch: expected ${expected}, counted ${actual}`,
+          },
+        });
+      }
+    }
   }
 
   async checkOut(tenant: TenantContext, activityInstanceId: string, userId: string, dto: GpsEventDto) {

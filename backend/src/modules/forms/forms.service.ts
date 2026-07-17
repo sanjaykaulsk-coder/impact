@@ -2,9 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { evaluateFormula } from '../reports/formula';
+import { ArchetypeSection, buildArchetypeSections, skuSectionTitles } from './archetypes';
 import { CreateFormTemplateDto } from './dto/create-form-template.dto';
 import { UpdateFormTemplateDto } from './dto/update-form-template.dto';
-import { UpsertDraftFormDto } from './dto/upsert-draft-form.dto';
+import { FormQuestionDto, UpsertDraftFormDto } from './dto/upsert-draft-form.dto';
 
 @Injectable()
 export class FormsService {
@@ -23,22 +25,44 @@ export class FormsService {
   /**
    * Creates the template plus its first version — a template with zero versions is never a valid
    * state a caller can observe, so version 1 is created in the same transaction, not as a
-   * separate "add a version" step.
+   * separate "add a version" step. When an archetype is named, the first draft is pre-populated
+   * from that report-format preset (report-format-library §1) with one question group per active
+   * SKU in the campaign's SKU master.
    */
   async create(tenant: TenantContext, dto: CreateFormTemplateDto, createdById: string) {
-    return this.prisma.runInTenantContext(tenant.clientId, (tx) =>
-      tx.formTemplate.create({
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const template = await tx.formTemplate.create({
         data: {
           clientId: tenant.clientId,
           campaignId: tenant.campaignId,
           name: dto.name,
           code: `${tenant.campaignId}-${dto.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 90) + '-' + Date.now().toString(36),
           description: dto.description,
+          archetype: dto.archetype,
           versions: { create: { version: 1, status: 'DRAFT', createdById } },
         },
         include: { versions: true },
-      }),
-    );
+      });
+
+      if (dto.archetype) {
+        const skus = await tx.campaignSku.findMany({
+          where: { campaignId: tenant.campaignId, isActive: true },
+          orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        });
+        if (dto.archetype !== 'ENQUIRY_LEADS' && skus.length === 0) {
+          throw new BadRequestException(
+            'This archetype needs at least one SKU in the Campaign SKU Master — add SKUs first, then create the form',
+          );
+        }
+        const sections = buildArchetypeSections(
+          dto.archetype,
+          skus.map((s) => ({ id: s.id, skuCode: s.skuCode, name: s.name, variantLabel: s.variantLabel })),
+        );
+        await this.writeSections(tx, template.versions[0].id, sections);
+      }
+
+      return this.loadTemplateTree(tx, tenant.campaignId, template.id);
+    });
   }
 
   /**
@@ -59,7 +83,12 @@ export class FormsService {
           include: {
             sections: {
               orderBy: { order: 'asc' },
-              include: { questions: { orderBy: { order: 'asc' }, include: { options: { orderBy: { order: 'asc' } } } } },
+              include: {
+                questions: {
+                  orderBy: { order: 'asc' },
+                  include: { options: { orderBy: { order: 'asc' } }, validationRules: true },
+                },
+              },
             },
             conditionalRules: true,
           },
@@ -90,11 +119,88 @@ export class FormsService {
     });
   }
 
+  /** Rejects a syntactically-invalid formula at save time, not at first render in the field. */
+  private assertFormulaValid(expression: string) {
+    try {
+      evaluateFormula(expression, {});
+    } catch (err) {
+      throw new BadRequestException(`Invalid formula "${expression}": ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Writes a section/question tree (shared by upsertDraft, archetype creation, and SKU sync).
+   * Two passes: questions first, then dependsOn links — a question may depend on one that appears
+   * later in the payload. Returns the payload-key → database-id map for conditional-rule wiring.
+   */
+  private async writeSections(
+    tx: Prisma.TransactionClient,
+    formVersionId: string,
+    sections: (ArchetypeSection | UpsertDraftFormDto['sections'][number])[],
+  ): Promise<Map<string, string>> {
+    const keyToQuestionId = new Map<string, string>();
+    const dependencies: { questionKey: string; dependsOnKey: string }[] = [];
+
+    for (const section of sections) {
+      const createdSection = await tx.formSection.create({
+        data: { formVersionId, title: section.title, order: section.order },
+      });
+      for (const question of section.questions as FormQuestionDto[]) {
+        if (question.fieldType === 'AUTO_CALCULATED') {
+          if (!question.formulaExpression) {
+            throw new BadRequestException(`Auto-calculated field "${question.label}" needs a formula`);
+          }
+          this.assertFormulaValid(question.formulaExpression);
+        }
+        const createdQuestion = await tx.formQuestion.create({
+          data: {
+            formSectionId: createdSection.id,
+            fieldType: question.fieldType,
+            label: question.label,
+            helpText: question.helpText,
+            order: question.order,
+            isMandatory: question.isMandatory,
+            controlsJson: (question.controlsJson ?? {}) as Prisma.InputJsonValue,
+            formulaExpression: question.formulaExpression,
+            defaultValueJson:
+              question.defaultValueJson === undefined ? undefined : (question.defaultValueJson as Prisma.InputJsonValue),
+            options: question.options
+              ? { create: question.options.map((o) => ({ label: o.label, value: o.value, order: o.order })) }
+              : undefined,
+            validationRules: question.validationRules
+              ? {
+                  create: question.validationRules.map((r) => ({
+                    ruleType: r.ruleType,
+                    configJson: r.configJson as Prisma.InputJsonValue,
+                  })),
+                }
+              : undefined,
+          },
+        });
+        keyToQuestionId.set(question.key, createdQuestion.id);
+        if (question.dependsOnQuestionKey) {
+          dependencies.push({ questionKey: question.key, dependsOnKey: question.dependsOnQuestionKey });
+        }
+      }
+    }
+
+    for (const dep of dependencies) {
+      const questionId = keyToQuestionId.get(dep.questionKey);
+      const dependsOnId = keyToQuestionId.get(dep.dependsOnKey);
+      if (!questionId || !dependsOnId) {
+        throw new BadRequestException(`Question dependency references a key not present in this draft ("${dep.dependsOnKey}")`);
+      }
+      await tx.formQuestion.update({ where: { id: questionId }, data: { dependsOnQuestionId: dependsOnId } });
+    }
+
+    return keyToQuestionId;
+  }
+
   /**
    * Replaces the entire DRAFT version's tree in one shot (delete + recreate) rather than exposing
-   * granular per-question CRUD endpoints — the minimal builder scope for this session. Safe
-   * because a DRAFT version is by definition never referenced by a FormResponse yet (only
-   * PUBLISHED versions are — spec §10's "publishing freezes a version forever").
+   * granular per-question CRUD endpoints. Safe because a DRAFT version is by definition never
+   * referenced by a FormResponse yet (only PUBLISHED versions are — spec §10's "publishing
+   * freezes a version forever").
    */
   async upsertDraft(tenant: TenantContext, templateId: string, dto: UpsertDraftFormDto) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
@@ -107,29 +213,7 @@ export class FormsService {
       // Cascades: FormSection -> FormQuestion -> {QuestionOption, ValidationRule, ConditionalRule}.
       await tx.formSection.deleteMany({ where: { formVersionId: draft.id } });
 
-      const keyToQuestionId = new Map<string, string>();
-      for (const section of dto.sections) {
-        const createdSection = await tx.formSection.create({
-          data: { formVersionId: draft.id, title: section.title, order: section.order },
-        });
-        for (const question of section.questions) {
-          const createdQuestion = await tx.formQuestion.create({
-            data: {
-              formSectionId: createdSection.id,
-              fieldType: question.fieldType,
-              label: question.label,
-              helpText: question.helpText,
-              order: question.order,
-              isMandatory: question.isMandatory,
-              controlsJson: (question.controlsJson ?? {}) as Prisma.InputJsonValue,
-              options: question.options
-                ? { create: question.options.map((o) => ({ label: o.label, value: o.value, order: o.order })) }
-                : undefined,
-            },
-          });
-          keyToQuestionId.set(question.key, createdQuestion.id);
-        }
-      }
+      const keyToQuestionId = await this.writeSections(tx, draft.id, dto.sections);
 
       for (const rule of dto.conditionalRules ?? []) {
         const triggerQuestionId = keyToQuestionId.get(rule.triggerQuestionKey);
@@ -153,6 +237,54 @@ export class FormsService {
   }
 
   /**
+   * Rebuilds ONLY the archetype's SKU-bound sections of the current draft to match the campaign's
+   * active SKU master (mid-campaign SKU change, report-format-library §5 test 4). Published
+   * versions are frozen and untouched — historical responses stay valid against the SKU list that
+   * existed when they were captured. Everything the admin customised outside the SKU sections is
+   * left exactly as it was.
+   */
+  async syncSkuQuestions(tenant: TenantContext, templateId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const template = await tx.formTemplate.findFirst({ where: { id: templateId, campaignId: tenant.campaignId } });
+      if (!template) throw new NotFoundException('Form template not found');
+      if (!template.archetype) {
+        throw new BadRequestException('This form was not created from an archetype — edit its fields directly instead');
+      }
+      const titles = skuSectionTitles(template.archetype);
+      if (titles.length === 0) {
+        throw new BadRequestException('This archetype has no SKU-bound sections to sync');
+      }
+
+      const draft = await tx.formVersion.findFirst({ where: { formTemplateId: templateId, status: 'DRAFT' } });
+      if (!draft) throw new BadRequestException('No draft version to sync — publish first to open a new draft');
+
+      const skus = await tx.campaignSku.findMany({
+        where: { campaignId: tenant.campaignId, isActive: true },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      });
+      const allSections = buildArchetypeSections(
+        template.archetype,
+        skus.map((s) => ({ id: s.id, skuCode: s.skuCode, name: s.name, variantLabel: s.variantLabel })),
+      );
+      const skuSections = allSections.filter((s) => titles.includes(s.title));
+
+      // Replace the SKU sections in place, keeping each one's existing order slot when present.
+      for (const skuSection of skuSections) {
+        const existing = await tx.formSection.findFirst({
+          where: { formVersionId: draft.id, title: skuSection.title },
+        });
+        if (existing) {
+          skuSection.order = existing.order;
+          await tx.formSection.delete({ where: { id: existing.id } });
+        }
+        await this.writeSections(tx, draft.id, [skuSection]);
+      }
+
+      return this.loadTemplateTree(tx, tenant.campaignId, templateId);
+    });
+  }
+
+  /**
    * Publishing freezes the current draft (spec §10) and immediately opens the next draft as a
    * clone of what was just published, so the builder always has exactly one editable draft and
    * the founder never has to explicitly "create version 2" — a fresh field to tweak just appears.
@@ -167,7 +299,12 @@ export class FormsService {
         include: {
           sections: {
             orderBy: { order: 'asc' },
-            include: { questions: { orderBy: { order: 'asc' }, include: { options: { orderBy: { order: 'asc' } } } } },
+            include: {
+              questions: {
+                orderBy: { order: 'asc' },
+                include: { options: { orderBy: { order: 'asc' } }, validationRules: true },
+              },
+            },
           },
           conditionalRules: true,
         },
@@ -184,6 +321,7 @@ export class FormsService {
       });
 
       const oldToNewQuestionId = new Map<string, string>();
+      const dependencyPairs: { oldQuestionId: string; oldDependsOnId: string }[] = [];
       for (const section of draft.sections) {
         const newSection = await tx.formSection.create({
           data: { formVersionId: newDraft.id, title: section.title, order: section.order },
@@ -198,13 +336,32 @@ export class FormsService {
               order: question.order,
               isMandatory: question.isMandatory,
               controlsJson: question.controlsJson as Prisma.InputJsonValue,
+              formulaExpression: question.formulaExpression,
+              defaultValueJson: question.defaultValueJson === null ? undefined : (question.defaultValueJson as Prisma.InputJsonValue),
               options: question.options.length
                 ? { create: question.options.map((o) => ({ label: o.label, value: o.value, order: o.order })) }
+                : undefined,
+              validationRules: question.validationRules.length
+                ? {
+                    create: question.validationRules.map((r) => ({
+                      ruleType: r.ruleType,
+                      configJson: r.configJson as Prisma.InputJsonValue,
+                    })),
+                  }
                 : undefined,
             },
           });
           oldToNewQuestionId.set(question.id, newQuestion.id);
+          if (question.dependsOnQuestionId) {
+            dependencyPairs.push({ oldQuestionId: question.id, oldDependsOnId: question.dependsOnQuestionId });
+          }
         }
+      }
+      for (const pair of dependencyPairs) {
+        const newQuestionId = oldToNewQuestionId.get(pair.oldQuestionId);
+        const newDependsOnId = oldToNewQuestionId.get(pair.oldDependsOnId);
+        if (!newQuestionId || !newDependsOnId) continue;
+        await tx.formQuestion.update({ where: { id: newQuestionId }, data: { dependsOnQuestionId: newDependsOnId } });
       }
       for (const rule of draft.conditionalRules) {
         const triggerQuestionId = oldToNewQuestionId.get(rule.triggerQuestionId);

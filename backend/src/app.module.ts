@@ -12,6 +12,8 @@ import { ExecutionModule } from './modules/execution/execution.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
 import { PjpModule } from './modules/pjp/pjp.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { SkusModule } from './modules/skus/skus.module';
 import { SupervisorModule } from './modules/supervisor/supervisor.module';
 
 @Module({
@@ -27,6 +29,8 @@ import { SupervisorModule } from './modules/supervisor/supervisor.module';
     FormsModule,
     HealthModule,
     PjpModule,
+    ReportsModule,
+    SkusModule,
     SupervisorModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

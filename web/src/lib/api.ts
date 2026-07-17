@@ -4,6 +4,7 @@ import type {
   AvailableAssignmentUser,
   AvailablePjpRow,
   CampaignBrandingResponse,
+  CampaignSkuResponse,
   CampaignSummary,
   ClientSummary,
   CreateAssignmentRequest,
@@ -13,6 +14,7 @@ import type {
   CreatePjpRequest,
   CreatePjpResponse,
   DecideApprovalRequest,
+  DfrReportResponse,
   FormTemplateDetail,
   FormTemplateSummary,
   MeResponse,
@@ -22,12 +24,14 @@ import type {
   PjpRowInput,
   PjpSummary,
   RequestOtpResponse,
+  StockReconciliationRow,
   SupervisorInboxItem,
   TokenPair,
   UpdateAssignmentRequest,
   UpdateCampaignRequest,
   UpdateClientRequest,
   UpsertBrandingRequest,
+  UpsertCampaignSkuRequest,
   UpsertDraftFormRequest,
   VerifyOtpResponse,
 } from '@impact/shared';
@@ -187,6 +191,39 @@ export const api = {
       request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}/publish`, {
         method: 'POST',
       }),
+    syncSkus: (campaignId: string, templateId: string) =>
+      request<FormTemplateDetail>(`/campaigns/${campaignId}/form-templates/${templateId}/sync-skus`, {
+        method: 'POST',
+      }),
+  },
+  skus: {
+    list: (campaignId: string, includeInactive = false) =>
+      request<CampaignSkuResponse[]>(`/campaigns/${campaignId}/skus${includeInactive ? '?includeInactive=true' : ''}`),
+    create: (campaignId: string, dto: UpsertCampaignSkuRequest) =>
+      request<CampaignSkuResponse>(`/campaigns/${campaignId}/skus`, { method: 'POST', body: JSON.stringify(dto) }),
+    update: (campaignId: string, skuId: string, dto: UpsertCampaignSkuRequest) =>
+      request<CampaignSkuResponse>(`/campaigns/${campaignId}/skus/${skuId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      }),
+  },
+  reports: {
+    dfr: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return request<DfrReportResponse>(`/campaigns/${campaignId}/reports/dfr${qs ? `?${qs}` : ''}`);
+    },
+    stockReconciliation: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return request<StockReconciliationRow[]>(
+        `/campaigns/${campaignId}/reports/stock-reconciliation${qs ? `?${qs}` : ''}`,
+      );
+    },
   },
   pjp: {
     list: (campaignId: string) => request<PjpSummary[]>(`/campaigns/${campaignId}/pjps`),

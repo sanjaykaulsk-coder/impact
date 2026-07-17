@@ -29,6 +29,15 @@ export class QuestionOptionDto {
   order!: number;
 }
 
+export class QuestionValidationRuleDto {
+  @IsString()
+  @MinLength(1)
+  ruleType!: string;
+
+  @IsObject()
+  configJson!: Record<string, unknown>;
+}
+
 export class FormQuestionDto {
   // Client-generated temporary key so ConditionalRuleDto can reference a question within the same
   // payload before it has a real database id — the whole draft tree is replaced on every save
@@ -64,6 +73,25 @@ export class FormQuestionDto {
   @IsOptional()
   @IsObject()
   controlsJson?: Record<string, unknown>;
+
+  // AUTO_CALCULATED fields only: the safe formula grammar from modules/reports/formula.ts.
+  @IsOptional()
+  @IsString()
+  formulaExpression?: string;
+
+  @IsOptional()
+  defaultValueJson?: unknown;
+
+  // Key of another question in the same payload this one depends on (renderer-level grouping).
+  @IsOptional()
+  @IsString()
+  dependsOnQuestionKey?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuestionValidationRuleDto)
+  validationRules?: QuestionValidationRuleDto[];
 }
 
 export class FormSectionDto {
