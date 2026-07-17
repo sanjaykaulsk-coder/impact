@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 16 July 2026 · **Phase:** C — approved. **Stage 2 Session A — COMPLETE. Stage 2 Session B — COMPLETE, founder-approved. Stage 2 Session C (supervisor thread) — built, awaiting the founder's real-device test loop.**
+**Last updated:** 17 July 2026 · **Phase:** C — approved. **Stage 2 Sessions A, B, C — ALL COMPLETE and founder-confirmed on real devices. The full vertical slice (admin → field execution → supervisor review) is done.** Next: Stage 3 (configuration depth) — awaiting the founder's written go-ahead.
 
 ## Stage 2 Session C — supervisor thread (this session, after founder approved Session B)
 
@@ -43,10 +43,11 @@ labeled).
 - **Verified**: `tsc --noEmit` clean (backend), `next build` clean including the new route (web),
   `flutter analyze`/`build linux`/`test` all clean (app). As with every backend feature built in
   this sandbox (no Docker/Postgres here), the actual live behavior of the full loop is unverified
-  here — needs the founder's own real-device test, which they explicitly asked to run themselves:
+  here — needed the founder's own real-device test, which they explicitly asked to run themselves:
   their field submission from today appears in the inbox → review the photo with its GPS stamp →
   reject with a reason → it comes back to the field app for correction → resubmit → supervisor
-  approves. **One extra step needed for that test**: today's already-completed activities
+  approves. **This full loop was run and confirmed working by the founder on 17 July 2026, on
+  their own devices, in both roles.** One extra step was needed for that test: the already-completed activities
   (check-in → photo → form → check-out all done during Session B's testing) predate this session's
   Approval-creation code, so they won't automatically be in the inbox — see "How to see it
   yourself" below for the one-line fix.
@@ -274,8 +275,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 1. Full visit end-to-end — **DONE**, confirmed synced on your phone
 2. Airplane-mode test (offline queueing + reconnect sync) — **DONE**, confirmed on your phone: offline items failed cleanly and visibly, reconnecting synced everything automatically
 3. Session B (field thread) — **approved**
-4. **Session C (supervisor thread) — built, waiting on your full test loop**: your field submission from today appears in the inbox → you review the photo with its GPS stamp → reject with a reason → it comes back to your field app for correction → you resubmit → supervisor approves. One-time SQL step needed first — see "How to see it yourself" below.
+4. Session C full test loop (inbox → photo/GPS review → reject with reason → correction on the phone → resubmit → approve, both roles, both devices) — **DONE, confirmed by the founder on 17 July 2026**
 5. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+6. **Approve the start of Stage 3 (configuration depth)** — per process rules, this is a phase boundary; nothing new gets built until written approval
 
 ## How to see it yourself
 
