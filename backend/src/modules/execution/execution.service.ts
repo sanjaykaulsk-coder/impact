@@ -50,10 +50,18 @@ export class ExecutionService {
   private async loadBundle(tx: Prisma.TransactionClient, activityInstanceId: string) {
     const activity = await tx.activityInstance.findUniqueOrThrow({
       where: { id: activityInstanceId },
-      include: { pjpRow: true, currentStage: { include: { milestones: { orderBy: { order: 'asc' }, include: MILESTONE_INCLUDE } } } },
+      include: {
+        pjpRow: true,
+        currentStage: {
+          include: {
+            milestones: { orderBy: { order: 'asc' }, include: MILESTONE_INCLUDE },
+            sopChecklistItems: { orderBy: { order: 'asc' } },
+          },
+        },
+      },
     });
     const milestone = activity.currentStage?.milestones[0] ?? null;
-    const [checkIn, checkOut, media, formResponse, approval] = await Promise.all([
+    const [checkIn, checkOut, media, formResponse, approval, sopResponses] = await Promise.all([
       tx.checkIn.findFirst({ where: { activityInstanceId } }),
       tx.checkOut.findFirst({ where: { activityInstanceId } }),
       tx.media.findMany({ where: { activityInstanceId }, orderBy: { createdAt: 'asc' } }),
@@ -64,8 +72,15 @@ export class ExecutionService {
       // One Approval row per activity, reused across reject -> resubmit -> approve cycles (see
       // supervisor.service.ts) — this is the field app's view of the supervisor's decision.
       tx.approval.findFirst({ where: { entityType: 'ACTIVITY_INSTANCE', entityId: activityInstanceId } }),
+      tx.sopChecklistResponse.findMany({ where: { activityInstanceId } }),
     ]);
-    return { activity, milestone, checkIn, checkOut, media, formResponse, approval };
+    const sopItems = (activity.currentStage?.sopChecklistItems ?? []).map((item) => ({
+      id: item.id,
+      label: item.label,
+      isMandatory: item.isMandatory,
+      status: sopResponses.find((r) => r.sopChecklistItemId === item.id)?.status ?? 'PENDING',
+    }));
+    return { activity, milestone, checkIn, checkOut, media, formResponse, approval, sopItems };
   }
 
   /** Finds (or, on first open, creates) the ActivityInstance behind a given assignment. A field
@@ -127,12 +142,32 @@ export class ExecutionService {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const activity = await tx.activityInstance.findUniqueOrThrow({
         where: { id: activityInstanceId },
-        include: { pjpRow: true, location: true },
+        include: {
+          pjpRow: true,
+          location: true,
+          currentStage: { include: { sopChecklistItems: { where: { isMandatory: true } } } },
+        },
       });
       this.assertOwnership(activity, userId);
 
       const existing = await tx.checkIn.findFirst({ where: { activityInstanceId } });
       if (existing) return { checkIn: existing, alreadyCheckedIn: true };
+
+      // Pre-activity preparation does NOT block commencement unless the stage explicitly says so
+      // (spec §11) — allowIncompletePreparation defaults true precisely so this gate is opt-in.
+      const stage = activity.currentStage;
+      if (stage && !stage.allowIncompletePreparation && stage.sopChecklistItems.length > 0) {
+        const responses = await tx.sopChecklistResponse.findMany({
+          where: { activityInstanceId, sopChecklistItemId: { in: stage.sopChecklistItems.map((i) => i.id) } },
+        });
+        const resolvedIds = new Set(responses.filter((r) => r.status !== 'PENDING').map((r) => r.sopChecklistItemId));
+        const unresolved = stage.sopChecklistItems.filter((i) => !resolvedIds.has(i.id));
+        if (unresolved.length > 0) {
+          throw new BadRequestException(
+            `Complete the pre-activity checklist before checking in: ${unresolved.map((i) => i.label).join(', ')}`,
+          );
+        }
+      }
 
       const plannedLat = activity.pjpRow?.latitude ?? activity.location?.latitude;
       const plannedLng = activity.pjpRow?.longitude ?? activity.location?.longitude;
@@ -573,6 +608,42 @@ export class ExecutionService {
       });
 
       return { checkOut, alreadyCheckedOut: false };
+    });
+  }
+
+  /** Marks one pre-activity SOP checklist item (spec §12) — direct, connectivity-required call
+   * like resubmit(), not routed through the offline outbox. Logged as a known limitation: if the
+   * founder finds field workers need to tick these off before they have signal, this needs the
+   * same offline treatment the milestone form and photo evidence already got in Session B. */
+  async markSopChecklistItem(
+    tenant: TenantContext,
+    activityInstanceId: string,
+    itemId: string,
+    userId: string,
+    status: 'COMPLETED' | 'NOT_APPLICABLE',
+    remarks?: string,
+  ) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({ where: { id: activityInstanceId } });
+      this.assertOwnership(activity, userId);
+
+      const item = await tx.sopChecklistItem.findUnique({ where: { id: itemId } });
+      if (!item) throw new NotFoundException('Checklist item not found');
+
+      return tx.sopChecklistResponse.upsert({
+        where: { activityInstanceId_sopChecklistItemId: { activityInstanceId, sopChecklistItemId: itemId } },
+        update: { status, markedByUserId: userId, markedAt: new Date(), remarks },
+        create: {
+          clientId: tenant.clientId,
+          campaignId: tenant.campaignId,
+          activityInstanceId,
+          sopChecklistItemId: itemId,
+          status,
+          markedByUserId: userId,
+          markedAt: new Date(),
+          remarks,
+        },
+      });
     });
   }
 

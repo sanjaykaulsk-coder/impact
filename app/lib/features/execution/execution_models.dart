@@ -228,6 +228,23 @@ class ActivityApproval {
       ActivityApproval(status: json['status'] as String, remarks: json['remarks'] as String?);
 }
 
+// Pre-activity SOP checklist item (spec §12), scoped to the activity's current stage.
+class SopChecklistItemStatus {
+  final String id;
+  final String label;
+  final bool isMandatory;
+  final String status; // PENDING | COMPLETED | NOT_APPLICABLE
+
+  SopChecklistItemStatus({required this.id, required this.label, required this.isMandatory, required this.status});
+
+  factory SopChecklistItemStatus.fromJson(Map<String, dynamic> json) => SopChecklistItemStatus(
+        id: json['id'] as String,
+        label: json['label'] as String,
+        isMandatory: json['isMandatory'] as bool,
+        status: json['status'] as String,
+      );
+}
+
 class ActivityBundle {
   final ActivityInstance activity;
   final Milestone? milestone;
@@ -236,6 +253,7 @@ class ActivityBundle {
   final List<MediaRecord> media;
   final bool hasFormResponse;
   final ActivityApproval? approval;
+  final List<SopChecklistItemStatus> sopItems;
 
   ActivityBundle({
     required this.activity,
@@ -245,6 +263,7 @@ class ActivityBundle {
     required this.media,
     required this.hasFormResponse,
     this.approval,
+    this.sopItems = const [],
   });
 
   factory ActivityBundle.fromJson(Map<String, dynamic> json) => ActivityBundle(
@@ -255,6 +274,9 @@ class ActivityBundle {
         media: (json['media'] as List<dynamic>? ?? []).map((m) => MediaRecord.fromJson(m as Map<String, dynamic>)).toList(),
         hasFormResponse: json['formResponse'] != null,
         approval: json['approval'] != null ? ActivityApproval.fromJson(json['approval'] as Map<String, dynamic>) : null,
+        sopItems: (json['sopItems'] as List<dynamic>? ?? [])
+            .map((i) => SopChecklistItemStatus.fromJson(i as Map<String, dynamic>))
+            .toList(),
       );
 }
 

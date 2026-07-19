@@ -121,4 +121,18 @@ class ExecutionRepository {
   Future<void> resubmit(String campaignId, String activityInstanceId) async {
     await api.post('/campaigns/$campaignId/activity-instances/$activityInstanceId/resubmit', const {});
   }
+
+  /// Marks one pre-activity SOP checklist item (spec §12). Direct call like resubmit() — not
+  /// routed through the offline outbox; see A-05x in ASSUMPTIONS.md for that known limitation.
+  Future<void> markSopChecklistItem(
+    String campaignId,
+    String activityInstanceId,
+    String itemId, {
+    required String status,
+  }) async {
+    await api.post(
+      '/campaigns/$campaignId/activity-instances/$activityInstanceId/sop-checklist/$itemId',
+      {'status': status},
+    );
+  }
 }

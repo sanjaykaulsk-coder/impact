@@ -1,8 +1,62 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 17 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (dynamic form builder full + Campaign SKU Master + DFR/reconciliation reporting) — built, gate test passing, awaiting founder review before S3.2.**
+**Last updated:** 18 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (form builder full + SKU Master + reporting) — approved. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — built, all checks passing, awaiting founder review before S3.3.**
 
-## Stage 3.1 — dynamic form builder full, Campaign SKU Master, DFR/reconciliation reporting (this session, after founder approved Stage 3 start)
+## Stage 3.2 — workflow builder, milestone engine, SOP checklists (this session, after founder approved Stage 3.1 and said "start stage 3.2")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S3.2 and spec §§11/12/16: configurable stages
+(add/remove/reorder, role assignment, approval rules, `allowIncompletePreparation`), the milestone
+engine (binding a stage's milestones to any of the campaign's PUBLISHED forms, with per-milestone
+mandatory photo/GPS/signature/KPI settings), and the pre-activity SOP checklist module with its
+five-status readiness view.
+
+- **Closes the gap flagged at the end of Stage 3.1**: nothing built in S3.1 (the SKU Master, the
+  archetype form presets) had a path onto the phone, because the field app's milestone flow only
+  ever saw the one form the seed script hard-wired. Now an admin can build a real workflow in the
+  web builder, bind a stage's milestone to any published form — including an S3.1 archetype form —
+  and it reaches the phone the same way the Session B milestone always has. This is real, but it's
+  still a single-milestone-per-activity flow (see "explicitly not built" below).
+- **A second RLS gap fix, same pattern as Session C's `Approval` fix (A-043/A-049)**: this session
+  builds directly on `Workflow`, one of the 16 tables A-043 flagged as missing the tenant-isolation
+  backstop. Fixed in migration `20260718090000_workflow_client_id_sop_checklist` — unlike
+  `Approval`, `Workflow` already had seeded rows, so this needed a real backfill (`UPDATE ... FROM
+  campaigns`), not just `ADD COLUMN NOT NULL` on an empty table. Verified live against the local
+  Postgres: RLS policy present, spatial indexes untouched, backfill correct. 14 of the original 16
+  gap tables remain, logged as before.
+- **Backend** (`backend/src/modules/workflows/`): the whole workflow tree (stages → milestones →
+  role assignments → approval rule → SOP checklist items) is replaced on every save, mirroring the
+  proven `FormsService.upsertDraft` pattern. One workflow per campaign, enforced in the service
+  layer. Editing is blocked while any activity is `PLANNED`/`IN_PROGRESS` against the current
+  workflow, so an edit can never silently orphan a field worker mid-visit. New SOP checklist
+  models (`SopChecklistItem`/`SopChecklistResponse`, RLS-covered from their first migration) plus
+  a mark-item endpoint on the execution side, and check-in is now blocked when a stage's
+  `allowIncompletePreparation` is false and mandatory items are unresolved — spec §11's own
+  explicit rule, opt-in, not the default.
+- **Readiness view**: a pure, unit-tested rollup (`workflows/readiness.ts`) into spec §12's exact
+  five statuses (Completed/Pending/Delayed/At risk/Not applicable) — the spec names the values but
+  not their triggers, so a documented practical reading was used (see A-048). Served at
+  `GET .../workflow/readiness` and shown on the new **Readiness** web page.
+- **Web admin**: new **Workflow Builder** page (stages, milestones with a form-version picker
+  restricted to published versions, role checkboxes, approval-rule toggle, SOP checklist editor)
+  and new **Readiness** page (date-filtered, read-only).
+- **Flutter app**: the activity screen now shows a pre-activity checklist (when the current stage
+  has one) before check-in, with Done/N/A buttons per item; a blocked check-in surfaces the
+  backend's exact reason (which items are still outstanding).
+- **Explicitly not built this session** (see A-050 for the full accounting): true multi-stage
+  progression on the phone — the field app still executes exactly one stage's milestones per
+  activity, same as Session B; the multi-level approval escalation ladder from spec §14 (only a
+  single required-approver role is recorded here, no chain or timeout); offline support for SOP
+  checklist marking (a direct online call today, same tradeoff already accepted for `resubmit()`).
+- **Verified**: backend `tsc --noEmit` clean; `next build` clean (two new routes); `flutter
+  analyze` 0 issues, `flutter test` all passing, `flutter build linux` clean; the full backend test
+  suite — S3.1's 7-test acceptance gate plus this session's 6-test readiness-rollup unit suite —
+  passes **13/13** against the real local Postgres (this build container has PostgreSQL 16
+  installed, A-045), including a fixture fix the S3.1 suite needed once `Workflow.clientId` became
+  required. Zero database residue after a run. **What's still unverified**: the founder's own
+  hands-on test — build a real workflow, bind an S3.1 archetype form to a milestone, run the whole
+  thing on the phone — needs their device time, same as every prior stage.
+
+## Stage 3.1 — dynamic form builder full, Campaign SKU Master, DFR/reconciliation reporting (previous session, after founder approved Stage 3 start)
 
 Per `docs/architecture/09-mvp-build-sequence.md` S3.1 and `docs/reference/report-format-library.md`
 in full — the scope explicitly listed for this stage: the full 35+ field-type form builder, the
@@ -328,18 +382,19 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 - **A-012 / A-021**: this build container has no Android emulator (no hardware virtualization) and cannot build an Android APK (its network policy blocks the Android SDK's own download host) — both are properties of this one container, not of the app. The Flutter app was instead verified as a real compiled Linux-desktop build driven end-to-end against the real backend. See "How to see it yourself" below for what this means for you.
 - **Camera capture and GPS** (part of Session B): cannot be exercised in this sandbox at all (no camera hardware, no location services). The screens are written and pass static analysis; they need confirming on your own Android phone.
 
-## Next (after founder review of Stage 3.1)
-- **Stage 3.2**: workflow builder + milestone engine (stages, approvals, SOP checklists, readiness view) — this is what lets a new archetype form actually be attached to a field milestone and reach the phone. Nothing built in S3.1 is phone-testable until this lands.
-- **Stage 3.3**: activity template library as configuration.
+## Next (after founder review of Stage 3.2)
+- **Stage 3.3**: activity template library as configuration (all 16 templates, campaign-level override behaviour).
 - **Stage 3.4**: PJP management depth (edit/cancel/postpone/reschedule/reassign with change history).
 - Founder decisions still pending from Phase A (spec §08): production OTP provider, cloud region, first shadow-pilot campaign.
-- 15 of the 16 tables missing the RLS `clientId` backstop (A-043) remain a known, logged gap — `Approval` was fixed in Stage 2 Session C; the rest are unscheduled.
+- 14 of the 16 tables originally missing the RLS `clientId` backstop (A-043) remain a known, logged gap — `Approval` (Session C) and `Workflow` (this session) are now both fixed; the rest are unscheduled.
+- Two things this session deliberately deferred, not silently dropped (A-050): true multi-stage progression on the phone, and the full multi-level approval escalation ladder (spec §14).
 
 ## Open items for the founder
 1. Stage 2 (Sessions A, B, C) — **approved and confirmed on your real devices**
-2. **Stage 3.1 (this session) — built, gate test passing, awaiting your review.** There is nothing to test on your phone yet for this stage specifically (see below for why) — what you can review is the web admin: SKU Master, the form builder's new archetype presets, and the Reports page.
-3. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-4. **Approve Stage 3.1, or request changes, before Stage 3.2 (workflow builder) starts** — per process rules, this is a phase boundary
+2. Stage 3.1 (form builder + SKU Master + reporting) — **approved**, you said "start stage 3.2"
+3. **Stage 3.2 (this session) — built, all checks passing, awaiting your review.** This is the first stage where you can genuinely test something new end to end on the phone (see "Reviewing Stage 3.2" below) — a real workflow you build yourself in the web admin, reaching a milestone on your device.
+4. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+5. **Approve Stage 3.2, or request changes, before Stage 3.3 (activity template library) starts** — per process rules, this is a phase boundary
 
 ## How to see it yourself
 
@@ -411,6 +466,37 @@ automatically):
    data since no new capture has happened against this yet (that arrives with Stage 3.2).
 
 There's no SQL step needed for this one — it's additive, new tables only.
+
+### Reviewing Stage 3.2 — build a real workflow and run it on your phone
+
+Pull this branch and re-run `./scripts/bootstrap.sh` (applies the new migration automatically — no
+SQL step needed here either, additive only). This is the first Stage 3 piece with something new to
+actually test on your phone, since a milestone can now point at any published form you build.
+
+1. **Web admin → SKU Master**: confirm the Bihar campaign still has its four demo SKUs (unchanged
+   from Stage 3.1).
+2. **Web admin → Forms → + New form**: create one from the "Profile" archetype if you haven't
+   already, name it something like "Test Outlet Visit", then **Publish** it (the builder's Publish
+   button) — a milestone can only bind to a *published* form, never a draft.
+3. **Web admin → Workflow Builder**: you'll see the existing seeded "Bihar Van Outlet Visit
+   Workflow" with its one stage and one milestone (exactly what Session B tested). Either edit that
+   milestone's "Bound form" dropdown to point at your new Profile form, or add a second milestone —
+   both are safe as long as no visit is currently `PLANNED`/`IN_PROGRESS` (the builder will refuse
+   to save otherwise, with a clear message, rather than silently breaking an in-progress visit).
+   While you're there, try adding a checklist item under "Pre-activity SOP checklist" and ticking
+   "Allow check-in with incomplete preparation" off, to see the blocking behavior — then turn it
+   back on before saving if you don't want check-in gated yet.
+4. **Web admin → Readiness**: pick today's date — you'll see Rahul Kumar's assignment(s) listed
+   with a status (Not applicable if the stage has no checklist yet, or Pending/At risk/Delayed once
+   it does).
+5. **Field app, on your phone**: open Rahul Kumar's assignment. If you added a checklist, you'll
+   see it above the check-in button with Done/N/A buttons per item — mark them, then check in as
+   usual. If you rebound the milestone to your new Profile form, the milestone form screen should
+   now show real SKU quantity/sales-value fields per product, exactly like the ones you saw
+   generated in the Forms page.
+
+That closes the loop the founder's own words described when Stage 3.1 finished: something built in
+config now genuinely reaches the phone.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

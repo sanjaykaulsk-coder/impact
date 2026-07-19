@@ -18,10 +18,12 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Campaigns', requiredPermission: 'edit', href: '/dashboard/campaigns' },
   { label: 'Forms', requiredPermission: 'manage_forms', href: '/dashboard/forms' },
   { label: 'SKU Master', requiredPermission: 'manage_forms', href: '/dashboard/skus' },
+  { label: 'Workflow Builder', requiredPermission: 'manage_forms', href: '/dashboard/workflow' },
   { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },
   { label: 'Assignments', requiredPermission: 'allocate', href: '/dashboard/assignments' },
   { label: 'Approvals', requiredPermission: 'approve', href: '/dashboard/approvals' },
   { label: 'Reports', requiredPermission: 'view_reports', href: '/dashboard/reports' },
+  { label: 'Readiness', requiredPermission: 'view_reports', href: '/dashboard/readiness' },
 ];
 
 export const NAV_SOON_ITEMS: NavItem[] = [

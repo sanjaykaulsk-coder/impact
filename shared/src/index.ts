@@ -582,3 +582,109 @@ export interface StockReconciliationRow {
   actualClosing: number | null;
   mismatch: number | null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Stage 3.2 — Workflow builder + milestone engine + SOP checklists (spec §§11, 12, 16)
+// ---------------------------------------------------------------------------------------------
+
+export type SopItemStatus = 'PENDING' | 'COMPLETED' | 'NOT_APPLICABLE';
+
+export interface RoleSummary {
+  code: string;
+  name: string;
+  category: string;
+}
+
+export interface SopChecklistItemInput {
+  label: string;
+  order: number;
+  isMandatory: boolean;
+}
+
+export interface SopChecklistItemResponse {
+  id: string;
+  label: string;
+  order: number;
+  isMandatory: boolean;
+}
+
+export interface MilestoneInput {
+  name: string;
+  order: number;
+  formVersionId?: string;
+  mandatoryPhotoCount: number;
+  mandatoryGps: boolean;
+  mandatorySignature: boolean;
+  kpiKey?: string;
+}
+
+export interface MilestoneResponse {
+  id: string;
+  name: string;
+  order: number;
+  formVersionId: string | null;
+  mandatoryPhotoCount: number;
+  mandatoryGps: boolean;
+  mandatorySignature: boolean;
+  kpiKey: string | null;
+}
+
+export interface StageInput {
+  name: string;
+  order: number;
+  allowIncompletePreparation: boolean;
+  milestones: MilestoneInput[];
+  assignedRoleCodes?: string[];
+  requiresApproval: boolean;
+  approverRoleCode?: string;
+  sopChecklistItems?: SopChecklistItemInput[];
+}
+
+export interface StageResponse {
+  id: string;
+  name: string;
+  order: number;
+  allowIncompletePreparation: boolean;
+  milestones: MilestoneResponse[];
+  stageAssignments: { role: { code: string; name: string } }[];
+  stageApprovalRules: { requiresApproval: boolean; approverRole: { code: string; name: string } | null }[];
+  sopChecklistItems: SopChecklistItemResponse[];
+}
+
+export interface UpsertWorkflowRequest {
+  name: string;
+  stages: StageInput[];
+}
+
+export interface WorkflowResponse {
+  id: string;
+  name: string;
+  stages: StageResponse[];
+}
+
+export interface ReadinessItemStatus {
+  id: string;
+  label: string;
+  isMandatory: boolean;
+  status: SopItemStatus;
+}
+
+export type ReadinessStatus = 'COMPLETED' | 'PENDING' | 'AT_RISK' | 'DELAYED' | 'NOT_APPLICABLE';
+
+export interface ReadinessRow {
+  activityInstanceId: string;
+  assignedUserName: string;
+  locationName: string;
+  stageName: string | null;
+  activityStatus: string;
+  status: ReadinessStatus;
+  percentComplete: number | null;
+  resolvedCount: number;
+  totalCount: number;
+  items: ReadinessItemStatus[];
+}
+
+export interface MarkSopItemRequest {
+  status: 'COMPLETED' | 'NOT_APPLICABLE';
+  remarks?: string;
+}

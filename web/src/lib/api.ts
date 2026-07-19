@@ -23,7 +23,9 @@ import type {
   PjpDetail,
   PjpRowInput,
   PjpSummary,
+  ReadinessRow,
   RequestOtpResponse,
+  RoleSummary,
   StockReconciliationRow,
   SupervisorInboxItem,
   TokenPair,
@@ -33,7 +35,9 @@ import type {
   UpsertBrandingRequest,
   UpsertCampaignSkuRequest,
   UpsertDraftFormRequest,
+  UpsertWorkflowRequest,
   VerifyOtpResponse,
+  WorkflowResponse,
 } from '@impact/shared';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -257,6 +261,14 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(dto),
       }),
+  },
+  workflow: {
+    get: (campaignId: string) => request<WorkflowResponse | null>(`/campaigns/${campaignId}/workflow`),
+    upsert: (campaignId: string, dto: UpsertWorkflowRequest) =>
+      request<WorkflowResponse>(`/campaigns/${campaignId}/workflow`, { method: 'PUT', body: JSON.stringify(dto) }),
+    roles: (campaignId: string) => request<RoleSummary[]>(`/campaigns/${campaignId}/workflow/roles`),
+    readiness: (campaignId: string, date?: string) =>
+      request<ReadinessRow[]>(`/campaigns/${campaignId}/workflow/readiness${date ? `?date=${date}` : ''}`),
   },
 };
 

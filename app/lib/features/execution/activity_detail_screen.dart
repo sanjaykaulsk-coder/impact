@@ -115,6 +115,25 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     }
   }
 
+  /// Marks one pre-activity SOP checklist item (spec §12). Direct online call, same reasoning as
+  /// resubmit() — this is a lightweight admin-configured checklist, not field-captured evidence.
+  Future<void> _markSopItem(String itemId, String status) async {
+    setState(() => _actionInProgress = true);
+    try {
+      await ref.read(executionRepositoryProvider).markSopChecklistItem(
+            _campaignId,
+            _bundle!.activity.id,
+            itemId,
+            status: status,
+          );
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update checklist: $e')));
+    } finally {
+      if (mounted) setState(() => _actionInProgress = false);
+    }
+  }
+
   /// After a rejected activity's flagged content has been redone (a new photo, an edited form),
   /// this puts it back in the supervisor's queue. A direct online call, not routed through the
   /// offline outbox — seeing the rejection at all already required connectivity.
@@ -220,6 +239,17 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade200)),
                   child: Text('Approved by your supervisor.', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
                 ),
+
+              if (bundle.sopItems.isNotEmpty && !hasCheckIn) ...[
+                Text('Pre-activity checklist', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                ...bundle.sopItems.map((item) => _SopChecklistTile(
+                      item: item,
+                      enabled: !_actionInProgress,
+                      onMark: (status) => _markSopItem(item.id, status),
+                    )),
+                const SizedBox(height: 12),
+              ],
 
               _RequirementTile(
                 icon: Icons.my_location,
@@ -334,6 +364,42 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _SopChecklistTile extends StatelessWidget {
+  final SopChecklistItemStatus item;
+  final bool enabled;
+  final ValueChanged<String> onMark;
+  const _SopChecklistTile({required this.item, required this.enabled, required this.onMark});
+
+  @override
+  Widget build(BuildContext context) {
+    final done = item.status == 'COMPLETED' || item.status == 'NOT_APPLICABLE';
+    return ListTile(
+      dense: true,
+      leading: Icon(
+        done ? Icons.check_circle : Icons.radio_button_unchecked,
+        color: done ? Colors.green : (item.isMandatory ? Colors.orange : Colors.grey),
+      ),
+      title: Text(item.label),
+      subtitle: Text(item.isMandatory ? 'Mandatory' : 'Optional'),
+      trailing: done
+          ? Text(item.status == 'COMPLETED' ? 'Done' : 'N/A', style: const TextStyle(color: Colors.green))
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: enabled ? () => onMark('NOT_APPLICABLE') : null,
+                  child: const Text('N/A'),
+                ),
+                TextButton(
+                  onPressed: enabled ? () => onMark('COMPLETED') : null,
+                  child: const Text('Done'),
+                ),
+              ],
+            ),
     );
   }
 }

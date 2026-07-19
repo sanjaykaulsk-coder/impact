@@ -186,6 +186,15 @@ enum SkuMovementType {
   CLOSING_STOCK_ACTUAL
 }
 
+// Pre-activity SOP checklist item status (spec §12). The readiness view's five statuses
+// (Completed/Pending/Delayed/At risk/Not applicable) are a rollup computed from these per-item
+// marks plus timing, not a sixth stored state — see ReadinessService.
+enum SopItemStatus {
+  PENDING
+  COMPLETED
+  NOT_APPLICABLE
+}
+
 // The spec's sync status model, §19.
 enum SyncStatus {
   DRAFT
@@ -1066,6 +1075,7 @@ model FieldResponse {
 
 model Workflow {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String   @db.Uuid
   campaignId String   @db.Uuid
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   name       String
@@ -1075,6 +1085,7 @@ model Workflow {
   stages            WorkflowStage[]
   activityInstances ActivityInstance[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("workflows")
 }
@@ -1094,6 +1105,7 @@ model WorkflowStage {
   milestones         Milestone[]
   stageAssignments   StageAssignment[]
   stageApprovalRules StageApprovalRule[]
+  sopChecklistItems  SopChecklistItem[]
   activityInstances  ActivityInstance[]
 
   @@unique([workflowId, order])
@@ -1146,6 +1158,51 @@ model StageApprovalRule {
   @@map("stage_approval_rules")
 }
 
+// Pre-activity SOP module (spec §12): a configurable checklist per stage — never the hard-coded
+// 14-item list spec §12 gives as examples, those are seed/demo defaults an admin can edit.
+model SopChecklistItem {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId        String        @db.Uuid
+  campaignId      String        @db.Uuid
+  workflowStageId String        @db.Uuid
+  workflowStage   WorkflowStage @relation(fields: [workflowStageId], references: [id], onDelete: Cascade)
+  label           String
+  order           Int
+  isMandatory     Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  responses SopChecklistResponse[]
+
+  @@unique([workflowStageId, order])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("sop_checklist_items")
+}
+
+// One row per (activity instance, checklist item) — who marked it and when, so the readiness
+// view (spec §12: % completion, Completed/Pending/Delayed/At risk/Not applicable) is a query over
+// real marks, not a derived guess.
+model SopChecklistResponse {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String            @db.Uuid
+  campaignId         String            @db.Uuid
+  activityInstanceId String            @db.Uuid
+  activityInstance   ActivityInstance  @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
+  sopChecklistItemId String            @db.Uuid
+  sopChecklistItem   SopChecklistItem  @relation(fields: [sopChecklistItemId], references: [id], onDelete: Cascade)
+  status             SopItemStatus     @default(PENDING)
+  markedByUserId     String?           @db.Uuid
+  markedAt           DateTime?
+  remarks            String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([activityInstanceId, sopChecklistItemId])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("sop_checklist_responses")
+}
+
 // ============================================================================
 // EXECUTION
 // ============================================================================
@@ -1191,6 +1248,7 @@ model ActivityInstance {
   deviationRequests   DeviationRequest[]
   exceptions          Exception[]
   alerts              Alert[]
+  sopChecklistResponses SopChecklistResponse[]
 
   @@index([campaignId])
   @@index([clientId])

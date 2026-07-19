@@ -86,7 +86,7 @@ async function publishAndWireMilestone(tenant: TenantContext, templateId: string
   const version = published.versions.find((v) => v.status === 'PUBLISHED')!;
 
   const workflow = await owner.workflow.create({
-    data: { campaignId: tenant.campaignId, name: `wf-${RUN_TAG}-${activitySeq++}` },
+    data: { clientId: tenant.clientId, campaignId: tenant.campaignId, name: `wf-${RUN_TAG}-${activitySeq++}` },
   });
   const stage = await owner.workflowStage.create({
     data: { workflowId: workflow.id, name: 'Execution', order: 0 },

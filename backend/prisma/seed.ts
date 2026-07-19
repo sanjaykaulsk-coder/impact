@@ -709,6 +709,7 @@ async function main() {
     update: {},
     create: {
       id: geoDeterministicId('WORKFLOW', 'Bihar Van Workflow'),
+      clientId: shakti.id,
       campaignId: campaignBihar.id,
       name: 'Bihar Van Outlet Visit Workflow',
     },
@@ -716,6 +717,10 @@ async function main() {
   const vanStage = await prisma.workflowStage.upsert({
     where: { workflowId_order: { workflowId: vanWorkflow.id, order: 0 } },
     update: {},
+    // allowIncompletePreparation stays true — this is the exact stage the founder already
+    // check-in/check-out tested end to end in Session B/C; turning on the SOP blocking gate here
+    // would be a real behavior change to an already-verified flow, not something to slip in
+    // silently as part of a schema retrofit.
     create: { workflowId: vanWorkflow.id, name: 'Outlet Visit', order: 0, allowIncompletePreparation: true },
   });
   await prisma.milestone.upsert({
@@ -731,6 +736,28 @@ async function main() {
       mandatorySignature: false,
     },
   });
+
+  // DEMO SOP checklist items (spec §12's example list, a fictional subset) — visible/markable but
+  // non-blocking since allowIncompletePreparation stays true above.
+  const sopItems: { label: string; order: number }[] = [
+    { label: 'Vehicle allocated', order: 0 },
+    { label: 'Stock loaded', order: 1 },
+    { label: 'Branding material checked', order: 2 },
+  ];
+  for (const item of sopItems) {
+    await prisma.sopChecklistItem.upsert({
+      where: { workflowStageId_order: { workflowStageId: vanStage.id, order: item.order } },
+      update: {},
+      create: {
+        clientId: shakti.id,
+        campaignId: campaignBihar.id,
+        workflowStageId: vanStage.id,
+        label: item.label,
+        order: item.order,
+        isMandatory: true,
+      },
+    });
+  }
 
   await prisma.campaignActivity.upsert({
     where: { id: geoDeterministicId('CAMPAIGN_ACTIVITY', 'Bihar Van Outlet Visit') },

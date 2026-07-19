@@ -15,6 +15,7 @@ import { PjpModule } from './modules/pjp/pjp.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SkusModule } from './modules/skus/skus.module';
 import { SupervisorModule } from './modules/supervisor/supervisor.module';
+import { WorkflowsModule } from './modules/workflows/workflows.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SupervisorModule } from './modules/supervisor/supervisor.module';
     ReportsModule,
     SkusModule,
     SupervisorModule,
+    WorkflowsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

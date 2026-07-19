@@ -19,6 +19,7 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
 import { InitMediaUploadDto } from './dto/init-media-upload.dto';
+import { MarkSopItemDto } from './dto/mark-sop-item.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { ExecutionService } from './execution.service';
 
@@ -134,6 +135,19 @@ export class ExecutionController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.execution.checkOut(tenant, activityInstanceId, user.id, dto);
+  }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/sop-checklist/:itemId')
+  markSopItem(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: MarkSopItemDto,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.execution.markSopChecklistItem(tenant, activityInstanceId, itemId, user.id, dto.status, dto.remarks);
   }
 
   @RequirePermissions('create')
