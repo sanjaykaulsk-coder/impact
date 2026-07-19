@@ -1,4 +1,6 @@
 import type {
+  ActivityTemplateSummary,
+  ApplyActivityTemplateRequest,
   ApprovalDecisionStatus,
   AssignmentSummary,
   AvailableAssignmentUser,
@@ -269,6 +271,14 @@ export const api = {
     roles: (campaignId: string) => request<RoleSummary[]>(`/campaigns/${campaignId}/workflow/roles`),
     readiness: (campaignId: string, date?: string) =>
       request<ReadinessRow[]>(`/campaigns/${campaignId}/workflow/readiness${date ? `?date=${date}` : ''}`),
+  },
+  activityTemplates: {
+    list: (campaignId: string) => request<ActivityTemplateSummary[]>(`/campaigns/${campaignId}/activity-templates`),
+    apply: (campaignId: string, dto: ApplyActivityTemplateRequest) =>
+      request<WorkflowResponse>(`/campaigns/${campaignId}/activity-templates/apply`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
   },
 };
 

@@ -1,6 +1,42 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — APPROVED, founder personally confirmed the approve/reject/resubmit loop, the Workflow Builder screen, and the Readiness screen. Full database security hardening (A-043's tenant-isolation gap) — DONE, verified. Stage 3.3 (activity template library) — starting.**
+**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 (activity template library) — built, all checks passing, awaiting founder review.**
+
+## Stage 3.3 — activity template library (this session, after founder approved Stage 3.2)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S3.3 and spec §9.4: all 16 named campaign
+templates as real configuration, and "campaign-level override behaviour" — applying a template
+never modifies the master.
+
+- **No new database tables needed** — `ActivityType`, `ActivityTemplate`, and `CampaignActivity`
+  already existed from the very first foundation session, fully shaped for exactly this (including
+  a `defaultConfigJson`/`configJson` pair), just never used by any real feature until now.
+- **Backend**: all 16 templates seeded as real rows — Van Campaign, Roadshow, Exhibition, Event,
+  Mela Stall, Mela Branding, Wholesale Activation, Retail Sales, Trial Generation, Seeding
+  Programme, Bike Activation, School Campaign, Haat Campaign, Retail Branding, Retail Recce, Custom
+  Activity. Four (Van Campaign, Mela Stall, School Campaign, Retail Branding) use the real
+  milestone lists spec §16 itself gives as examples; the other twelve get an honest, generic
+  two-milestone starter since the spec never lists their milestones — flagged, not disguised as
+  equally detailed. New `GET .../activity-templates` (browse) and `POST .../activity-templates/apply`
+  (apply to the current campaign) — applying reuses Stage 3.2's `WorkflowsService.upsert()`
+  directly, so it automatically inherits that screen's safety guard (refuses to replace a workflow
+  while any activity is mid-visit) rather than needing a second copy of that logic.
+- **Web admin**: new **Activity Templates** page — a card per template with an "Apply to this
+  campaign" button, clearly warning it replaces the campaign's current workflow before it proceeds
+  (confirmation dialog), and pointing the admin to Workflow Builder afterward to review/customize
+  what got generated.
+- **Explicitly not built this session**: an editor for the master template library itself (adding
+  a 17th template, or changing what a given template defaults to) — the 16 are fixed seeded
+  content today; a new one is a future ask, same posture as Stage 3.1's report archetypes.
+- **Verified**: backend `tsc --noEmit` clean; the seed script re-run with real type-checking
+  (not the fast/unchecked mode) against a live Postgres, confirmed all 16 templates present with
+  correct content; the list and apply endpoints tested live end-to-end against a real running
+  backend — applying a template genuinely built a real workflow with the right stages and
+  milestones, and correctly refused when a live activity was in the way, proving the reused
+  Stage 3.2 guard actually fires, not just compiles; `next build` clean; the full backend test
+  suite still passes 13/13 after the change.
+
+## Stage 3.2 — workflow builder, milestone engine, SOP checklists (previous session, after founder approved Stage 3.1 and said "start stage 3.2")
 
 ## Database security hardening — full backstop closed (this session, founder decision)
 
@@ -421,8 +457,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 3. **Stage 3.2 (workflow builder + milestone engine + SOP checklists) — APPROVED**, 19 July 2026. You personally confirmed: the full reject → resubmit → approve loop on the web admin (Danapur Cantt Market, using the no-phone script to stand in for the field side); the Workflow Builder screen (attached a form to a milestone, added and saved a mandatory checklist item, added and saved a non-mandatory one, both survived a hard page reload); and the Readiness screen (correctly shows "no activities" for a date with nothing scheduled — working as designed, not broken).
 4. **Database security hardening — DONE.** You asked for a plain-language recommendation and chose "fix it now" — it's fixed and verified.
 5. **A no-phone testing tool exists now** (`backend/scripts/simulate-field-visit.mjs`, with a `--resubmit` mode) — plays a full field visit against your own backend without needing a phone in hand. Keep using it for future testing sessions.
-6. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-7. **Stage 3.3 (activity template library) is starting now**, per your approval above
+6. **Stage 3.3 (activity template library) — built, all checks passing, awaiting your review.** See "Reviewing Stage 3.3" below for a quick self-guided walkthrough (no phone needed — this one's entirely a web admin feature).
+7. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+8. **Approve Stage 3.3, or request changes, before Stage 3.4 (PJP management depth) starts** — per process rules, this is a phase boundary
 
 ## How to see it yourself
 
@@ -525,6 +562,27 @@ actually test on your phone, since a milestone can now point at any published fo
 
 That closes the loop the founder's own words described when Stage 3.1 finished: something built in
 config now genuinely reaches the phone.
+
+### Reviewing Stage 3.3 — activity template library
+
+Pull this branch (no new migration this time — no database change needed at all, so a plain
+`git pull` + `./scripts/bootstrap.sh` is enough). This one's web-only, no phone needed:
+
+1. Log in as Rohan Mehta (`9000000001`, Super Admin) and open **Activity Templates** in the
+   sidebar. You'll see all 16 standard campaign types as cards — Van Campaign, Roadshow,
+   Exhibition, Mela Stall, School Campaign, Retail Branding, and the rest.
+2. Pick one you haven't used yet — **Mela Stall** is a good one, since it has a real milestone
+   list (stall handover → branding → opening photo → midday activity → sales update → closing
+   stock → final photo), not a generic placeholder.
+3. Click **Apply to this campaign** — you'll get a confirmation warning first, since this replaces
+   whatever workflow the campaign currently has (your Bihar campaign's existing "Outlet Visit"
+   workflow, in this case).
+4. Once applied, open **Workflow Builder** — you should see the Mela Stall milestones sitting
+   there as a real, editable workflow, exactly as if you'd typed them in by hand.
+5. If you want your original Bihar Van workflow back afterward, you can rebuild it manually in
+   Workflow Builder, or apply the **Van Campaign** template instead — it has the same real
+   milestone list your original Session B testing used (vehicle departure → location arrival →
+   setup → activity start → demonstration → sales → closure → return).
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

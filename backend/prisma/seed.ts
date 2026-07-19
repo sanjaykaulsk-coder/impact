@@ -613,6 +613,198 @@ async function main() {
     create: { name: 'Van Campaign', code: 'VAN_CAMPAIGN', description: 'Mobile van outreach with outlet visits' },
   });
 
+  // -- Activity Template Library (Stage 3.3, spec §9.4) ----------------------------------------
+  // All 16 named templates. `defaultConfigJson` uses the exact shape WorkflowsService.upsert()
+  // expects (a single stage containing the template's milestones) — "applying" a template later
+  // just replays this JSON straight into that same endpoint, so there's only one place that knows
+  // how to build a workflow tree, not two. Four templates (Van Campaign, Mela Stall, School
+  // Campaign, Retail Branding) use spec §16's own real milestone lists verbatim. The other twelve
+  // have no milestone list in the spec, so they get one honest, generic two-milestone starter
+  // (arrival/setup, then activity/closure) rather than invented specificity — logged as A-054.
+  interface TemplateMilestone {
+    name: string;
+    mandatoryPhotoCount: number;
+    mandatoryGps: boolean;
+  }
+  const genericMilestones: TemplateMilestone[] = [
+    { name: 'Arrival & setup', mandatoryPhotoCount: 1, mandatoryGps: true },
+    { name: 'Activity & closure', mandatoryPhotoCount: 1, mandatoryGps: true },
+  ];
+  function templateConfig(milestones: TemplateMilestone[]) {
+    return {
+      stages: [
+        {
+          name: 'Execution',
+          order: 0,
+          allowIncompletePreparation: true,
+          milestones: milestones.map((m, i) => ({
+            name: m.name,
+            order: i,
+            mandatoryPhotoCount: m.mandatoryPhotoCount,
+            mandatoryGps: m.mandatoryGps,
+            mandatorySignature: false,
+          })),
+        },
+      ],
+    };
+  }
+
+  const activityTemplateDefs: { typeName: string; typeCode: string; description: string; milestones: TemplateMilestone[] }[] = [
+    {
+      typeName: 'Van Campaign',
+      typeCode: 'VAN_CAMPAIGN',
+      description: 'Mobile van outreach with outlet visits',
+      milestones: [
+        { name: 'Vehicle departure', mandatoryPhotoCount: 0, mandatoryGps: true },
+        { name: 'Location arrival', mandatoryPhotoCount: 0, mandatoryGps: true },
+        { name: 'Setup complete', mandatoryPhotoCount: 1, mandatoryGps: true },
+        { name: 'Activity start', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Product demonstration', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Sales update', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Activity closure', mandatoryPhotoCount: 1, mandatoryGps: true },
+        { name: 'Return to base', mandatoryPhotoCount: 0, mandatoryGps: true },
+      ],
+    },
+    {
+      typeName: 'Roadshow',
+      typeCode: 'ROADSHOW',
+      description: 'Multi-stop promotional roadshow',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Exhibition',
+      typeCode: 'EXHIBITION',
+      description: 'Staffed exhibition stall',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Event',
+      typeCode: 'EVENT',
+      description: 'Standalone branded event',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Mela Stall',
+      typeCode: 'MELA_STALL',
+      description: 'Fair/mela stall activation',
+      milestones: [
+        { name: 'Stall handover', mandatoryPhotoCount: 0, mandatoryGps: true },
+        { name: 'Branding completed', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Opening photo', mandatoryPhotoCount: 1, mandatoryGps: true },
+        { name: 'Midday activity', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Sales update', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Closing stock', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Final photo', mandatoryPhotoCount: 1, mandatoryGps: true },
+      ],
+    },
+    {
+      typeName: 'Mela Branding',
+      typeCode: 'MELA_BRANDING',
+      description: 'Fair/mela branding-only activation',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Wholesale Activation',
+      typeCode: 'WHOLESALE_ACTIVATION',
+      description: 'Wholesale market activation',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Retail Sales',
+      typeCode: 'RETAIL_SALES',
+      description: 'In-store retail sales push',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Trial Generation',
+      typeCode: 'TRIAL_GENERATION',
+      description: 'Product trial / sampling drive',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Seeding Programme',
+      typeCode: 'SEEDING_PROGRAMME',
+      description: 'Van/bike-based product seeding',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Bike Activation',
+      typeCode: 'BIKE_ACTIVATION',
+      description: 'Two-wheeler-based activation',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'School Campaign',
+      typeCode: 'SCHOOL_CAMPAIGN',
+      description: 'In-school engagement campaign',
+      milestones: [
+        { name: 'School arrival', mandatoryPhotoCount: 0, mandatoryGps: true },
+        { name: 'Authority permission', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Setup', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Session start', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Session completion', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Participation count', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Authority signature', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Closure', mandatoryPhotoCount: 0, mandatoryGps: true },
+      ],
+    },
+    {
+      typeName: 'Haat Campaign',
+      typeCode: 'HAAT_CAMPAIGN',
+      description: 'Rural periodic-market (haat) activation',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Retail Branding',
+      typeCode: 'RETAIL_BRANDING',
+      description: 'Retail outlet branding installation',
+      milestones: [
+        { name: 'Shop identified', mandatoryPhotoCount: 0, mandatoryGps: true },
+        { name: 'Shopkeeper consent', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Measurements', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Before images', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Material installation', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'After images', mandatoryPhotoCount: 1, mandatoryGps: false },
+        { name: 'Quality approval', mandatoryPhotoCount: 0, mandatoryGps: false },
+        { name: 'Shopkeeper acknowledgement', mandatoryPhotoCount: 0, mandatoryGps: false },
+      ],
+    },
+    {
+      typeName: 'Retail Recce',
+      typeCode: 'RETAIL_RECCE',
+      description: 'Retail outlet recce survey',
+      milestones: genericMilestones,
+    },
+    {
+      typeName: 'Custom Activity',
+      typeCode: 'CUSTOM_ACTIVITY',
+      description: 'Blank starting point for a non-standard activity',
+      milestones: genericMilestones,
+    },
+  ];
+
+  for (const def of activityTemplateDefs) {
+    const activityType =
+      def.typeCode === 'VAN_CAMPAIGN'
+        ? vanActivityType
+        : await prisma.activityType.upsert({
+            where: { code: def.typeCode },
+            update: {},
+            create: { name: def.typeName, code: def.typeCode, description: def.description, isCustom: def.typeCode === 'CUSTOM_ACTIVITY' },
+          });
+    await prisma.activityTemplate.upsert({
+      where: { code: `${def.typeCode}_DEFAULT` },
+      update: {},
+      create: {
+        activityTypeId: activityType.id,
+        name: def.typeName,
+        code: `${def.typeCode}_DEFAULT`,
+        description: def.description,
+        defaultConfigJson: templateConfig(def.milestones),
+      },
+    });
+  }
+
   // -- Campaign SKU Master (report-format-library §3) — DEMO seed data, spec's Demo Data section.
   // Fictional Shakti product list mirroring the workbook's category + variant + MRP shape.
   const demoSkus = [

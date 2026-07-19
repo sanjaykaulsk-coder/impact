@@ -688,3 +688,19 @@ export interface MarkSopItemRequest {
   status: 'COMPLETED' | 'NOT_APPLICABLE';
   remarks?: string;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Stage 3.3 — Activity template library (spec §9.4)
+// ---------------------------------------------------------------------------------------------
+
+export interface ActivityTemplateSummary {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  activityType: { id: string; name: string; code: string; isCustom: boolean };
+}
+
+export interface ApplyActivityTemplateRequest {
+  activityTemplateId: string;
+}

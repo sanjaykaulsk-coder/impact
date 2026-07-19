@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { StorageModule } from './core/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { ActivityTemplatesModule } from './modules/activity-templates/activity-templates.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
@@ -22,6 +23,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     StorageModule,
+    ActivityTemplatesModule,
     AuthModule,
     AssignmentsModule,
     CampaignsModule,
