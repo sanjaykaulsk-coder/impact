@@ -9,13 +9,27 @@
 // is an obviously synthetic solid-colour test image generated on the fly — not a real photograph,
 // clearly test data, consistent with every other demo identity already in the seed data.
 
-import { createHash, randomUUID } from 'node:crypto';
-import sharp from 'sharp';
+// Printed before anything else — including before any imports have a chance to hang or fail
+// silently — so a stuck/failed run is never just a blinking cursor with no clue why.
+console.log('Starting the field-visit simulation... (this should take about 10-15 seconds)');
 
 const BASE = process.env.API_BASE_URL ?? 'http://localhost:4000/api/v1';
 const MOBILE_NUMBER = '9000000009'; // Rahul Kumar (Promoter, Bihar)
 const TARGET_LOCATION = 'Danapur Cantt Market';
 const DEVICE_FINGERPRINT = 'simulated-field-visit-script';
+const REQUEST_TIMEOUT_MS = 15000;
+
+let createHash, randomUUID, sharp;
+try {
+  ({ createHash, randomUUID } = await import('node:crypto'));
+  sharp = (await import('sharp')).default;
+  console.log('Loaded dependencies OK.');
+} catch (err) {
+  console.error('\nCould not load a required package (sharp, used to generate the test photo).');
+  console.error('This usually means "pnpm install" needs to be re-run in the backend/ folder.');
+  console.error('Underlying error:', err.message);
+  process.exit(1);
+}
 
 function log(step, msg) {
   console.log(`[${step}] ${msg}`);
@@ -25,11 +39,27 @@ async function api(path, { method = 'GET', body, token, isForm = false } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body && !isForm) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: isForm ? body : body ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(
+        `${method} ${path} did not respond within ${REQUEST_TIMEOUT_MS / 1000} seconds — is the backend ` +
+          `actually running at ${BASE}? (Check the bootstrap.sh terminal tab for "listening on".)`,
+      );
+    }
+    throw new Error(`${method} ${path} failed to connect: ${err.message} — is the backend running at ${BASE}?`);
+  } finally {
+    clearTimeout(timeout);
+  }
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {
