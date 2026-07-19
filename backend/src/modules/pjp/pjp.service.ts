@@ -71,6 +71,7 @@ export class PjpService {
     const pjp = await this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const created = await tx.pJP.create({
         data: {
+          clientId: tenant.clientId,
           campaignId: tenant.campaignId,
           fileName: dto.fileName,
           uploadedById,
@@ -82,6 +83,7 @@ export class PjpService {
       await tx.pJPRow.createMany({
         data: valid.map((row) => ({
           pjpId: created.id,
+          clientId: tenant.clientId,
           campaignId: tenant.campaignId,
           date: new Date(row.date!),
           stateName: row.stateName!.trim(),
@@ -125,6 +127,7 @@ export class PjpService {
       if (!pjp) {
         pjp = await tx.pJP.create({
           data: {
+            clientId: tenant.clientId,
             campaignId: tenant.campaignId,
             fileName: PjpService.MANUAL_ENTRIES_FILE_NAME,
             uploadedById,
@@ -139,6 +142,7 @@ export class PjpService {
       await tx.pJPRow.create({
         data: {
           pjpId: pjp.id,
+          clientId: tenant.clientId,
           campaignId: tenant.campaignId,
           date: new Date(row.date!),
           stateName: row.stateName!.trim(),

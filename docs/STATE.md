@@ -1,6 +1,32 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 18 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (form builder full + SKU Master + reporting) — approved. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — built, all checks passing, awaiting founder review before S3.3.**
+**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (form builder full + SKU Master + reporting) — approved. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — built, all checks passing, awaiting founder review before S3.3. Full database security hardening (A-043's tenant-isolation gap) — DONE, founder-approved, verified.**
+
+## Database security hardening — full backstop closed (this session, founder decision)
+
+The founder asked for a plain-language explanation of the known database security gap (first found
+in Stage 2, tracked as A-043) and decided: fix it in full now, rather than patch it piecemeal as
+future stages happen to touch one of the affected tables.
+
+**In plain terms:** the system has two locks that keep one client's data separate from another's.
+Lock #1 is the everyday app code — always active, already tested by the founder. Lock #2 is a
+backup check built into the database itself, so that even if a bug ever slipped past Lock #1, the
+database would refuse to hand over the wrong client's data anyway. 15 tables (things like route
+plans, stock reports, sales reports, attendance records) only had Lock #1. All 15 now have both.
+
+No real client data was ever at risk — everything in the system today is demo/test data — but the
+next few build stages (trip planning, GPS tracking, sales & stock reporting) would have built
+directly on several of these unprotected tables, making the eventual fix bigger and riskier the
+longer it waited. It's done now, verified working, at no cost to the founder beyond the normal pull
+and rebuild.
+
+Migration `20260719070000_full_tenant_isolation_hardening`. Full detail in `docs/ASSUMPTIONS.md`
+(A-051) for anyone who wants the technical record — every table in the system that holds
+campaign-specific data now has the database-level backstop, not just the app-level one. Confirmed
+by running the full backend test suite (13 tests) against a real database with this protection
+switched on, all passing, and by directly checking the database itself that the protection is
+active on every one of the 15 tables. Nothing else changed — no screens, no behavior, purely a
+behind-the-scenes safety improvement.
 
 ## Stage 3.2 — workflow builder, milestone engine, SOP checklists (this session, after founder approved Stage 3.1 and said "start stage 3.2")
 
@@ -392,9 +418,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 ## Open items for the founder
 1. Stage 2 (Sessions A, B, C) — **approved and confirmed on your real devices**
 2. Stage 3.1 (form builder + SKU Master + reporting) — **approved**, you said "start stage 3.2"
-3. **Stage 3.2 (this session) — built, all checks passing, awaiting your review.** This is the first stage where you can genuinely test something new end to end on the phone (see "Reviewing Stage 3.2" below) — a real workflow you build yourself in the web admin, reaching a milestone on your device.
-4. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-5. **Approve Stage 3.2, or request changes, before Stage 3.3 (activity template library) starts** — per process rules, this is a phase boundary
+3. **Stage 3.2 (workflow builder + SOP checklists) — built, all checks passing, awaiting your review and approve/reject test on the phone/laptop.** This is the first stage where you can genuinely test something new end to end on the phone (see "Reviewing Stage 3.2" below) — a real workflow you build yourself in the web admin, reaching a milestone on your device.
+4. **Database security hardening — DONE.** You asked for a plain-language recommendation and chose "fix it now" — it's fixed, verified, and needs no action from you beyond the normal pull and rebuild before you test.
+5. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
+6. **Approve Stage 3.2, or request changes, before Stage 3.3 (activity template library) starts** — per process rules, this is a phase boundary
 
 ## How to see it yourself
 

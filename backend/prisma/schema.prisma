@@ -692,6 +692,7 @@ model ActivityTemplate {
 // library"). This is what ActivityInstance rows are actual field occurrences of.
 model CampaignActivity {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String            @db.Uuid
   campaignId         String            @db.Uuid
   campaign           Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   activityTemplateId String?           @db.Uuid
@@ -705,6 +706,7 @@ model CampaignActivity {
 
   activityInstances ActivityInstance[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("campaign_activities")
 }
@@ -755,6 +757,7 @@ model Location {
 
 model PJP {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String    @db.Uuid
   campaignId   String    @db.Uuid
   campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   fileName     String
@@ -768,12 +771,14 @@ model PJP {
 
   rows PJPRow[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("pjps")
 }
 
 model PJPRow {
   id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId         String       @db.Uuid
   pjpId            String       @db.Uuid
   pjp              PJP          @relation(fields: [pjpId], references: [id], onDelete: Cascade)
   campaignId       String       @db.Uuid
@@ -803,12 +808,14 @@ model PJPRow {
   userAssignments   UserAssignment[]
   activityInstances ActivityInstance[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("pjp_rows")
 }
 
 model Route {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String   @db.Uuid
   campaignId  String   @db.Uuid
   campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   name        String
@@ -818,6 +825,7 @@ model Route {
 
   routeLocations RouteLocation[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("routes")
 }
@@ -1183,19 +1191,19 @@ model SopChecklistItem {
 // view (spec §12: % completion, Completed/Pending/Delayed/At risk/Not applicable) is a query over
 // real marks, not a derived guess.
 model SopChecklistResponse {
-  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId           String            @db.Uuid
-  campaignId         String            @db.Uuid
-  activityInstanceId String            @db.Uuid
-  activityInstance   ActivityInstance  @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
-  sopChecklistItemId String            @db.Uuid
-  sopChecklistItem   SopChecklistItem  @relation(fields: [sopChecklistItemId], references: [id], onDelete: Cascade)
-  status             SopItemStatus     @default(PENDING)
-  markedByUserId     String?           @db.Uuid
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
+  campaignId         String           @db.Uuid
+  activityInstanceId String           @db.Uuid
+  activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
+  sopChecklistItemId String           @db.Uuid
+  sopChecklistItem   SopChecklistItem @relation(fields: [sopChecklistItemId], references: [id], onDelete: Cascade)
+  status             SopItemStatus    @default(PENDING)
+  markedByUserId     String?          @db.Uuid
   markedAt           DateTime?
   remarks            String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@unique([activityInstanceId, sopChecklistItemId])
   @@index([clientId])
@@ -1232,22 +1240,22 @@ model ActivityInstance {
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 
-  formResponses       FormResponse[]
-  attendances         Attendance[]
-  checkIns            CheckIn[]
-  checkOuts           CheckOut[]
-  gpsPoints           GPSPoint[]
-  routeTraces         RouteTrace[]
-  media               Media[]
-  mediaUploadSessions MediaUploadSession[]
-  signatures          Signature[]
-  stockReports        StockReport[]
-  salesReports        SalesReport[]
-  leads               Lead[]
-  consumers           Consumer[]
-  deviationRequests   DeviationRequest[]
-  exceptions          Exception[]
-  alerts              Alert[]
+  formResponses         FormResponse[]
+  attendances           Attendance[]
+  checkIns              CheckIn[]
+  checkOuts             CheckOut[]
+  gpsPoints             GPSPoint[]
+  routeTraces           RouteTrace[]
+  media                 Media[]
+  mediaUploadSessions   MediaUploadSession[]
+  signatures            Signature[]
+  stockReports          StockReport[]
+  salesReports          SalesReport[]
+  leads                 Lead[]
+  consumers             Consumer[]
+  deviationRequests     DeviationRequest[]
+  exceptions            Exception[]
+  alerts                Alert[]
   sopChecklistResponses SopChecklistResponse[]
 
   @@index([campaignId])
@@ -1257,6 +1265,7 @@ model ActivityInstance {
 
 model Attendance {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String            @db.Uuid
   activityInstanceId String?           @db.Uuid
   activityInstance   ActivityInstance? @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
   userId             String            @db.Uuid
@@ -1268,6 +1277,7 @@ model Attendance {
   selfieMediaId      String?           @db.Uuid
   createdAt          DateTime          @default(now())
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("attendances")
 }
@@ -1309,6 +1319,7 @@ model CheckOut {
 // rules can evaluate confidence, not just raw distance.
 model GPSPoint {
   id                      String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                String                                @db.Uuid
   activityInstanceId      String?                               @db.Uuid
   activityInstance        ActivityInstance?                     @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
   userId                  String                                @db.Uuid
@@ -1324,6 +1335,7 @@ model GPSPoint {
   recordedAt              DateTime
   createdAt               DateTime                              @default(now())
 
+  @@index([clientId])
   @@index([activityInstanceId])
   @@index([campaignId])
   @@map("gps_points")
@@ -1437,6 +1449,7 @@ model Signature {
 
 model StockReport {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
   activityInstanceId String           @db.Uuid
   activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
   campaignId         String           @db.Uuid
@@ -1446,6 +1459,7 @@ model StockReport {
 
   items StockItem[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("stock_reports")
 }
@@ -1472,6 +1486,7 @@ model StockItem {
 
 model SalesReport {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
   activityInstanceId String           @db.Uuid
   activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
   campaignId         String           @db.Uuid
@@ -1482,6 +1497,7 @@ model SalesReport {
 
   items SalesItem[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("sales_reports")
 }
@@ -1502,6 +1518,7 @@ model SalesItem {
 
 model Lead {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String            @db.Uuid
   activityInstanceId String?           @db.Uuid
   activityInstance   ActivityInstance? @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
   campaignId         String            @db.Uuid
@@ -1511,12 +1528,14 @@ model Lead {
   status             LeadStatus        @default(NEW)
   createdAt          DateTime          @default(now())
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("leads")
 }
 
 model Retailer {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId    String     @db.Uuid
   campaignId  String     @db.Uuid
   name        String
   shopName    String?
@@ -1527,12 +1546,14 @@ model Retailer {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("retailers")
 }
 
 model Consumer {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String            @db.Uuid
   activityInstanceId String?           @db.Uuid
   activityInstance   ActivityInstance? @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
   campaignId         String            @db.Uuid
@@ -1541,6 +1562,7 @@ model Consumer {
   notes              String?
   createdAt          DateTime          @default(now())
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("consumers")
 }
@@ -1572,6 +1594,7 @@ model Approval {
 // Activity continues while approval is pending (spec §14) — never a blocking gate on the device.
 model DeviationRequest {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
   activityInstanceId String           @db.Uuid
   activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
   campaignId         String           @db.Uuid
@@ -1586,12 +1609,14 @@ model DeviationRequest {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("deviation_requests")
 }
 
 model Exception {
   id                      String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                String            @db.Uuid
   campaignId              String            @db.Uuid
   category                String
   severity                ExceptionSeverity @default(MEDIUM)
@@ -1613,6 +1638,7 @@ model Exception {
 
   escalations Escalation[]
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("exceptions")
 }
@@ -1665,6 +1691,7 @@ model Escalation {
 
 model Comment {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @db.Uuid
   entityType   String
   entityId     String   @db.Uuid
   campaignId   String   @db.Uuid
@@ -1672,6 +1699,7 @@ model Comment {
   body         String
   createdAt    DateTime @default(now())
 
+  @@index([clientId])
   @@index([campaignId])
   @@index([entityType, entityId])
   @@map("comments")
@@ -1706,6 +1734,7 @@ model AuditLog {
 
 model Report {
   id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId          String       @db.Uuid
   campaignId        String       @db.Uuid
   type              ReportType
   format            ReportFormat
@@ -1715,6 +1744,7 @@ model Report {
   periodEnd         DateTime?
   createdAt         DateTime     @default(now())
 
+  @@index([clientId])
   @@index([campaignId])
   @@map("reports")
 }

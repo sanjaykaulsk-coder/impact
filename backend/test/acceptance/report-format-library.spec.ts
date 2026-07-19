@@ -177,7 +177,7 @@ beforeAll(async () => {
     create: { name: 'Van Campaign', code: 'VAN_CAMPAIGN' },
   });
   await owner.campaignActivity.create({
-    data: { campaignId: campaignA.id, activityTypeId: activityType.id, name: 'Acceptance activity', configJson: {} },
+    data: { clientId: clientA.id, campaignId: campaignA.id, activityTypeId: activityType.id, name: 'Acceptance activity', configJson: {} },
   });
   const location = await owner.location.findFirst();
 

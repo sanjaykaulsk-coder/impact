@@ -539,6 +539,7 @@ export class ExecutionService {
       if (actual !== expected) {
         await tx.exception.create({
           data: {
+            clientId: tenant.clientId,
             campaignId: tenant.campaignId,
             category: 'STOCK_MISMATCH',
             severity: 'HIGH',

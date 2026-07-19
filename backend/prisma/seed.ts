@@ -764,6 +764,7 @@ async function main() {
     update: {},
     create: {
       id: geoDeterministicId('CAMPAIGN_ACTIVITY', 'Bihar Van Outlet Visit'),
+      clientId: shakti.id,
       campaignId: campaignBihar.id,
       activityTypeId: vanActivityType.id,
       name: 'Bihar Van Outlet Visit',
@@ -778,6 +779,7 @@ async function main() {
     update: {},
     create: {
       id: geoDeterministicId('PJP', 'Bihar Van Seed Route'),
+      clientId: shakti.id,
       campaignId: campaignBihar.id,
       fileName: 'Seed data — Bihar Van route',
       uploadedById: rohan.id,
@@ -793,6 +795,7 @@ async function main() {
     create: {
       id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Patna Haat Ground'),
       pjpId: vanPjp.id,
+      clientId: shakti.id,
       campaignId: campaignBihar.id,
       date: new Date(),
       stateName: 'Bihar',
@@ -830,6 +833,7 @@ async function main() {
     create: {
       id: geoDeterministicId('PJP_ROW', 'Bihar Van Seed Route', 'Danapur Cantt Market'),
       pjpId: vanPjp.id,
+      clientId: shakti.id,
       campaignId: campaignBihar.id,
       date: new Date(),
       stateName: 'Bihar',
