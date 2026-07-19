@@ -68,7 +68,50 @@ async function api(path, { method = 'GET', body, token, isForm = false } = {}) {
   return json;
 }
 
+async function resubmitOnly() {
+  log('1/3', `Requesting OTP for ${MOBILE_NUMBER}...`);
+  const otp = await api('/auth/otp/request', { method: 'POST', body: { mobileNumber: MOBILE_NUMBER } });
+  if (!otp.devOtpCode) throw new Error('No dev OTP code returned — is OTP_PROVIDER set to something other than "mock"?');
+
+  log('2/3', 'Verifying OTP and logging in...');
+  const auth = await api('/auth/otp/verify', {
+    method: 'POST',
+    body: {
+      challengeId: otp.challengeId,
+      code: otp.devOtpCode,
+      device: { fingerprint: DEVICE_FINGERPRINT, model: 'Simulated test device', osVersion: 'N/A', appVersion: 'script' },
+    },
+  });
+  const token = auth.accessToken;
+  log('2/3', `Logged in as ${auth.user.fullName}.`);
+
+  const assignments = await api('/me/assignments', { token });
+  let assignment = assignments.find((a) => a.pjpRow?.locationName === TARGET_LOCATION);
+  if (!assignment) {
+    // Once checked out, an assignment can drop out of /me/assignments (status no longer
+    // ASSIGNED/IN_PROGRESS) — fall back to re-deriving the activity via getOrCreateActivity,
+    // which is safe to call again since it always returns the existing activity if one exists.
+    throw new Error(
+      `Could not find "${TARGET_LOCATION}" in your active assignments — if it's already been ` +
+        `checked out, this script doesn't currently have another way to find its activity ID. ` +
+        `Tell Claude and this can be extended.`,
+    );
+  }
+  const campaignId = assignment.campaign.id;
+  const bundle = await api(`/campaigns/${campaignId}/assignments/${assignment.id}/activity`, { token });
+
+  log('3/3', 'Resubmitting for review...');
+  await api(`/campaigns/${campaignId}/activity-instances/${bundle.activity.id}/resubmit`, { method: 'POST', token });
+
+  console.log('\nDone. Danapur Cantt Market has been resubmitted and should be back in the');
+  console.log('Approvals page, Pending tab — refresh it in your browser to see it.');
+}
+
 async function main() {
+  if (process.argv.includes('--resubmit')) {
+    return resubmitOnly();
+  }
+
   log('1/7', `Requesting OTP for ${MOBILE_NUMBER}...`);
   const otp = await api('/auth/otp/request', { method: 'POST', body: { mobileNumber: MOBILE_NUMBER } });
   if (!otp.devOtpCode) {
