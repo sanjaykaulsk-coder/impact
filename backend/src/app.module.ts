@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { AuditModule } from './core/audit/audit.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { StorageModule } from './core/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -22,6 +23,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuditModule,
     StorageModule,
     ActivityTemplatesModule,
     AuthModule,

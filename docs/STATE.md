@@ -1,8 +1,41 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 (activity template library) — built, all checks passing, awaiting founder review.**
+**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 — APPROVED. Stage 3.4 (PJP management depth) — built, all checks passing, awaiting founder review.**
 
-## Stage 3.3 — activity template library (this session, after founder approved Stage 3.2)
+## Stage 3.4 — PJP management depth (this session, after founder approved Stage 3.3)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S3.4 and spec §13: edit / cancel / postpone /
+reschedule / reassign a planned visit, with full change history, plus sample upload templates.
+
+- **No schema migration needed** — `PJPRow.status` already had all four states this needed
+  (`ACTIVE`/`CANCELLED`/`POSTPONED`/`RESCHEDULED`) since the very first foundation session. The
+  `audit_logs` table also already existed (spec §37's immutable-audit-log requirement, called out
+  in CLAUDE.md as day-one architecture) but nothing had ever written to it before — this stage adds
+  the first real writer, a small shared `AuditService`, and every PJP row action from here now
+  leaves a permanent, unchangeable record of exactly what changed, when, and by whom.
+- **Backend**: five new actions per PJP row — edit (location/contact/remarks/sequence), cancel,
+  postpone (short delay, same plan), reschedule (a plan change, may move sequence too), and
+  reassign supervisor — plus a history endpoint that reads back every change ever made to that
+  row. A stop that already has field activity genuinely in progress or completed can no longer be
+  edited, cancelled, postponed, or rescheduled (protects the field record from becoming
+  inconsistent with what actually happened); reassigning the supervisor is deliberately exempt
+  from that lock, since a mid-day handover is a normal, legitimate need.
+- **Web admin**: the PJP detail view now shows each stop's status and current supervisor, with a
+  "Manage" button opening edit/cancel/postpone/reschedule/reassign/history in place. A "Download a
+  sample CSV" link on the upload screen gives a ready-to-fill template (opens directly in Excel).
+- **Explicitly not built this session**: team reassignment (only supervisor) — there's no Team
+  management feature anywhere yet to pick a team from, so a team picker would point at nothing;
+  and a separate multi-stop Route entity — this stage covers a single visit's own fields, not a
+  bigger structured route object, matching what the build-sequence document actually calls for at
+  this stage.
+- **Verified**: backend `tsc --noEmit` clean; `next build` clean; all six new endpoints tested live
+  against a real running backend and a real logged-in session — including proving the
+  in-progress-activity lock actually blocks edit/cancel/postpone/reschedule but correctly still
+  allows reassigning the supervisor, and reading back a correct, time-ordered history for a row
+  that had been edited, postponed, and rescheduled in sequence; full backend test suite still
+  13/13; QA grep clean.
+
+## Stage 3.3 — activity template library (previous session, after founder approved Stage 3.2)
 
 Per `docs/architecture/09-mvp-build-sequence.md` S3.3 and spec §9.4: all 16 named campaign
 templates as real configuration, and "campaign-level override behaviour" — applying a template
@@ -457,9 +490,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 3. **Stage 3.2 (workflow builder + milestone engine + SOP checklists) — APPROVED**, 19 July 2026. You personally confirmed: the full reject → resubmit → approve loop on the web admin (Danapur Cantt Market, using the no-phone script to stand in for the field side); the Workflow Builder screen (attached a form to a milestone, added and saved a mandatory checklist item, added and saved a non-mandatory one, both survived a hard page reload); and the Readiness screen (correctly shows "no activities" for a date with nothing scheduled — working as designed, not broken).
 4. **Database security hardening — DONE.** You asked for a plain-language recommendation and chose "fix it now" — it's fixed and verified.
 5. **A no-phone testing tool exists now** (`backend/scripts/simulate-field-visit.mjs`, with a `--resubmit` mode) — plays a full field visit against your own backend without needing a phone in hand. Keep using it for future testing sessions.
-6. **Stage 3.3 (activity template library) — built, all checks passing, awaiting your review.** See "Reviewing Stage 3.3" below for a quick self-guided walkthrough (no phone needed — this one's entirely a web admin feature).
+6. **Stage 3.3 (activity template library) — APPROVED**, 19 July 2026. You personally confirmed on your own machine: the Activity Templates tab listing all 16 templates, applying "Mela Stall" to the Bihar campaign, and the resulting workflow (stage "Execution" with milestones Stall handover, Branding completed, Opening photo, Midday activity, and more) appearing correctly in Workflow Builder.
 7. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-8. **Approve Stage 3.3, or request changes, before Stage 3.4 (PJP management depth) starts** — per process rules, this is a phase boundary
+8. **Stage 3.4 (PJP management depth) — built, all checks passing, awaiting your review.** See "Reviewing Stage 3.4" below for a self-guided walkthrough (no phone needed — entirely a web admin feature).
+9. **Approve Stage 3.4, or request changes, before Stage 3.5 starts** — per process rules, this is a phase boundary
 
 ## How to see it yourself
 
@@ -583,6 +617,25 @@ Pull this branch (no new migration this time — no database change needed at al
    Workflow Builder, or apply the **Van Campaign** template instead — it has the same real
    milestone list your original Session B testing used (vehicle departure → location arrival →
    setup → activity start → demonstration → sales → closure → return).
+
+### Reviewing Stage 3.4 — PJP management depth
+
+Also web-only, no phone needed. No database change this time either.
+
+1. Log in as Rohan Mehta (`9000000001`, Super Admin) and open **PJP Upload**. Click into the
+   "Seed data — Bihar Van route" file to open it.
+2. You'll now see a **Status** and **Supervisor** column on each stop, and a **Manage** button.
+   Click Manage on any stop (e.g. "Patna City Haat Ground").
+3. Try **Edit** — change the contact person or remarks, save, and see it update in the table.
+4. Try **Postpone** — pick a new date and save. The stop's status badge should change to
+   POSTPONED and its date should move.
+5. Try **Reassign supervisor** — pick a name from the dropdown (anyone with a role on this
+   campaign) and save.
+6. Click **History** — you should see every change you just made listed newest-first, with who
+   made it and when: reassign, then postpone, then edit.
+7. Try **Cancel** on a different stop — confirm it moves to CANCELLED status.
+8. On the upload screen, there's now a **"Download a sample CSV"** link — click it to see the
+   ready-to-fill template you can hand to whoever prepares your route plans.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

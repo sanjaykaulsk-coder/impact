@@ -6,6 +6,7 @@ import type {
   AvailableAssignmentUser,
   AvailablePjpRow,
   CampaignBrandingResponse,
+  CancelPjpRowRequest,
   CampaignSkuResponse,
   CampaignSummary,
   ClientSummary,
@@ -23,10 +24,15 @@ import type {
   MyAccessResponse,
   MyCampaignSummary,
   PjpDetail,
+  PjpRowHistoryEntry,
   PjpRowInput,
+  PjpRowResponse,
   PjpSummary,
+  PostponePjpRowRequest,
   ReadinessRow,
+  ReassignPjpRowRequest,
   RequestOtpResponse,
+  ReschedulePjpRowRequest,
   RoleSummary,
   StockReconciliationRow,
   SupervisorInboxItem,
@@ -34,6 +40,7 @@ import type {
   UpdateAssignmentRequest,
   UpdateCampaignRequest,
   UpdateClientRequest,
+  UpdatePjpRowRequest,
   UpsertBrandingRequest,
   UpsertCampaignSkuRequest,
   UpsertDraftFormRequest,
@@ -240,6 +247,18 @@ export const api = {
       request<PjpDetail>(`/campaigns/${campaignId}/pjps/${pjpId}/publish`, { method: 'POST' }),
     addManualLocation: (campaignId: string, row: PjpRowInput) =>
       request<PjpDetail>(`/campaigns/${campaignId}/pjps/manual-row`, { method: 'POST', body: JSON.stringify(row) }),
+    updateRow: (campaignId: string, pjpId: string, rowId: string, dto: UpdatePjpRowRequest) =>
+      request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+    cancelRow: (campaignId: string, pjpId: string, rowId: string, dto: CancelPjpRowRequest) =>
+      request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/cancel`, { method: 'POST', body: JSON.stringify(dto) }),
+    postponeRow: (campaignId: string, pjpId: string, rowId: string, dto: PostponePjpRowRequest) =>
+      request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/postpone`, { method: 'POST', body: JSON.stringify(dto) }),
+    rescheduleRow: (campaignId: string, pjpId: string, rowId: string, dto: ReschedulePjpRowRequest) =>
+      request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/reschedule`, { method: 'POST', body: JSON.stringify(dto) }),
+    reassignRow: (campaignId: string, pjpId: string, rowId: string, dto: ReassignPjpRowRequest) =>
+      request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/reassign`, { method: 'POST', body: JSON.stringify(dto) }),
+    rowHistory: (campaignId: string, pjpId: string, rowId: string) =>
+      request<PjpRowHistoryEntry[]>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/history`),
   },
   assignments: {
     list: (campaignId: string) => request<AssignmentSummary[]>(`/campaigns/${campaignId}/assignments`),

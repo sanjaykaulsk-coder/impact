@@ -3,8 +3,25 @@
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { parseCsv } from '@/lib/csv';
-import type { CreatePjpResponse, MyAccessResponse, PjpDetail, PjpRowInput, PjpSummary } from '@impact/shared';
+import type {
+  AvailableAssignmentUser,
+  CreatePjpResponse,
+  MyAccessResponse,
+  PjpDetail,
+  PjpRowHistoryEntry,
+  PjpRowInput,
+  PjpRowResponse,
+  PjpSummary,
+} from '@impact/shared';
 import { useEffect, useRef, useState } from 'react';
+
+type RowAction = 'edit' | 'cancel' | 'postpone' | 'reschedule' | 'reassign' | 'history';
+
+const SAMPLE_CSV = [
+  'Visit date,State,District,Tehsil,Location / outlet,Latitude,Longitude,Contact person,Remarks',
+  '2026-08-01,Bihar,Patna,Patna Sadar,Haat Ground,25.5941,85.1376,Ramesh Singh,Weekly haat day',
+  '2026-08-02,Bihar,Patna,Danapur,Danapur Cantt Market,25.6269,85.0446,,',
+].join('\n');
 
 type ExpectedField =
   | 'date'
@@ -66,6 +83,19 @@ export default function PjpPage() {
   const [openPjpId, setOpenPjpId] = useState<string | null>(null);
   const [openPjpDetail, setOpenPjpDetail] = useState<PjpDetail | null>(null);
   const [publishing, setPublishing] = useState(false);
+
+  const [managingRowId, setManagingRowId] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<RowAction | null>(null);
+  const [rowActionSaving, setRowActionSaving] = useState(false);
+  const [rowActionError, setRowActionError] = useState<string | null>(null);
+  const [rowActionNotice, setRowActionNotice] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ locationName?: string; contactPerson?: string; remarks?: string }>({});
+  const [dateForm, setDateForm] = useState<{ newDate?: string; reason?: string }>({});
+  const [cancelReason, setCancelReason] = useState('');
+  const [reassignSupervisorId, setReassignSupervisorId] = useState('');
+  const [reassignReason, setReassignReason] = useState('');
+  const [availableSupervisors, setAvailableSupervisors] = useState<AvailableAssignmentUser[] | null>(null);
+  const [rowHistory, setRowHistory] = useState<PjpRowHistoryEntry[] | null>(null);
 
   const [addingManual, setAddingManual] = useState(false);
   const [manualForm, setManualForm] = useState<PjpRowInput>({});
@@ -213,6 +243,138 @@ export default function PjpPage() {
     }
   };
 
+  const closeRowManagement = () => {
+    setManagingRowId(null);
+    setActiveAction(null);
+    setRowActionError(null);
+    setEditForm({});
+    setDateForm({});
+    setCancelReason('');
+    setReassignSupervisorId('');
+    setReassignReason('');
+    setRowHistory(null);
+  };
+
+  const startManagingRow = (row: PjpRowResponse) => {
+    setManagingRowId(row.id);
+    setActiveAction(null);
+    setRowActionError(null);
+    setRowActionNotice(null);
+    setEditForm({ locationName: row.locationName, contactPerson: row.contactPerson ?? '', remarks: row.remarks ?? '' });
+    setDateForm({ newDate: row.date.slice(0, 10) });
+    setReassignSupervisorId(row.supervisorUserId ?? '');
+  };
+
+  const chooseAction = async (action: RowAction) => {
+    setActiveAction(action);
+    setRowActionError(null);
+    if (action === 'reassign' && selectedCampaignId && !availableSupervisors) {
+      try {
+        setAvailableSupervisors(await api.assignments.availableUsers(selectedCampaignId));
+      } catch {
+        setAvailableSupervisors([]);
+      }
+    }
+    if (action === 'history' && selectedCampaignId && openPjpId && managingRowId) {
+      try {
+        setRowHistory(await api.pjp.rowHistory(selectedCampaignId, openPjpId, managingRowId));
+      } catch (err) {
+        setRowActionError(err instanceof ApiError ? err.message : 'Could not load history for this stop');
+      }
+    }
+  };
+
+  const afterRowAction = async (message: string) => {
+    if (!selectedCampaignId || !openPjpId) return;
+    setRowActionNotice(message);
+    const detail = await api.pjp.get(selectedCampaignId, openPjpId);
+    setOpenPjpDetail(detail);
+    setActiveAction(null);
+  };
+
+  const saveEdit = async () => {
+    if (!selectedCampaignId || !openPjpId || !managingRowId) return;
+    setRowActionSaving(true);
+    setRowActionError(null);
+    try {
+      await api.pjp.updateRow(selectedCampaignId, openPjpId, managingRowId, editForm);
+      await afterRowAction('Saved.');
+    } catch (err) {
+      setRowActionError(err instanceof ApiError ? err.message : 'Could not save changes');
+    } finally {
+      setRowActionSaving(false);
+    }
+  };
+
+  const submitCancel = async () => {
+    if (!selectedCampaignId || !openPjpId || !managingRowId) return;
+    setRowActionSaving(true);
+    setRowActionError(null);
+    try {
+      await api.pjp.cancelRow(selectedCampaignId, openPjpId, managingRowId, { reason: cancelReason || undefined });
+      await afterRowAction('This stop has been cancelled.');
+    } catch (err) {
+      setRowActionError(err instanceof ApiError ? err.message : 'Could not cancel this stop');
+    } finally {
+      setRowActionSaving(false);
+    }
+  };
+
+  const submitPostpone = async () => {
+    if (!selectedCampaignId || !openPjpId || !managingRowId || !dateForm.newDate) return;
+    setRowActionSaving(true);
+    setRowActionError(null);
+    try {
+      await api.pjp.postponeRow(selectedCampaignId, openPjpId, managingRowId, { newDate: dateForm.newDate, reason: dateForm.reason || undefined });
+      await afterRowAction(`Postponed to ${dateForm.newDate}.`);
+    } catch (err) {
+      setRowActionError(err instanceof ApiError ? err.message : 'Could not postpone this stop');
+    } finally {
+      setRowActionSaving(false);
+    }
+  };
+
+  const submitReschedule = async () => {
+    if (!selectedCampaignId || !openPjpId || !managingRowId || !dateForm.newDate) return;
+    setRowActionSaving(true);
+    setRowActionError(null);
+    try {
+      await api.pjp.rescheduleRow(selectedCampaignId, openPjpId, managingRowId, { newDate: dateForm.newDate, reason: dateForm.reason || undefined });
+      await afterRowAction(`Rescheduled to ${dateForm.newDate}.`);
+    } catch (err) {
+      setRowActionError(err instanceof ApiError ? err.message : 'Could not reschedule this stop');
+    } finally {
+      setRowActionSaving(false);
+    }
+  };
+
+  const submitReassign = async () => {
+    if (!selectedCampaignId || !openPjpId || !managingRowId || !reassignSupervisorId) return;
+    setRowActionSaving(true);
+    setRowActionError(null);
+    try {
+      await api.pjp.reassignRow(selectedCampaignId, openPjpId, managingRowId, {
+        supervisorUserId: reassignSupervisorId,
+        reason: reassignReason || undefined,
+      });
+      await afterRowAction('Supervisor reassigned.');
+    } catch (err) {
+      setRowActionError(err instanceof ApiError ? err.message : 'Could not reassign this stop');
+    } finally {
+      setRowActionSaving(false);
+    }
+  };
+
+  const downloadSampleCsv = () => {
+    const blob = new Blob([SAMPLE_CSV], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pjp-sample-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!selectedCampaignId) {
     return (
       <div className="card" style={{ maxWidth: 480 }}>
@@ -235,7 +397,8 @@ export default function PjpPage() {
           <h2>Upload a route plan (CSV)</h2>
           <p className="subtitle">
             Expected columns: {EXPECTED_FIELDS.map((f) => f.label.replace(' (optional)', '')).join(', ')}. Header
-            names are matched automatically where possible — adjust any mapping below before importing.
+            names are matched automatically where possible — adjust any mapping below before importing. Not sure of
+            the format? <button type="button" className="btn-secondary" onClick={downloadSampleCsv}>Download a sample CSV</button> — open it in Excel, fill in your rows, and save as CSV to upload here.
           </p>
           <input
             ref={fileInputRef}
@@ -473,6 +636,9 @@ export default function PjpPage() {
                   <th>Tehsil</th>
                   <th>Location</th>
                   <th>Contact</th>
+                  <th>Status</th>
+                  <th>Supervisor</th>
+                  {canManage && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -484,18 +650,193 @@ export default function PjpPage() {
                     <td>{r.tehsilName}</td>
                     <td>{r.locationName}</td>
                     <td>{r.contactPerson ?? ''}</td>
+                    <td>
+                      <span className={`badge status-${r.status === 'ACTIVE' ? 'active' : 'inactive'}`}>{r.status}</span>
+                    </td>
+                    <td>{r.supervisorName ?? '—'}</td>
+                    {canManage && (
+                      <td>
+                        <button className="btn-secondary" onClick={() => startManagingRow(r)}>
+                          Manage
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {managingRowId && (() => {
+            const row = openPjpDetail.rows.find((r) => r.id === managingRowId);
+            if (!row) return null;
+            return (
+              <div className="panel" style={{ marginTop: 16, background: 'var(--surface-alt, #f7f7f7)' }}>
+                <div className="toolbar">
+                  <h3 style={{ margin: 0 }}>
+                    Manage stop — {row.locationName} ({row.date.slice(0, 10)})
+                  </h3>
+                  <button className="btn-secondary" onClick={closeRowManagement}>
+                    Close
+                  </button>
+                </div>
+
+                {rowActionError && <div className="error-banner">{rowActionError}</div>}
+                {rowActionNotice && !rowActionError && <p style={{ color: 'var(--brand-primary)', fontSize: 14 }}>{rowActionNotice}</p>}
+
+                <div className="panel-actions" style={{ marginBottom: 16 }}>
+                  <button className="btn-secondary" onClick={() => chooseAction('edit')}>
+                    Edit
+                  </button>
+                  <button className="btn-secondary" onClick={() => chooseAction('cancel')} disabled={row.status === 'CANCELLED'}>
+                    Cancel
+                  </button>
+                  <button className="btn-secondary" onClick={() => chooseAction('postpone')}>
+                    Postpone
+                  </button>
+                  <button className="btn-secondary" onClick={() => chooseAction('reschedule')}>
+                    Reschedule
+                  </button>
+                  <button className="btn-secondary" onClick={() => chooseAction('reassign')}>
+                    Reassign supervisor
+                  </button>
+                  <button className="btn-secondary" onClick={() => chooseAction('history')}>
+                    History
+                  </button>
+                </div>
+
+                {activeAction === 'edit' && (
+                  <div className="form-grid">
+                    <div className="field">
+                      <label>Location / outlet</label>
+                      <input
+                        value={editForm.locationName ?? ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, locationName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Contact person</label>
+                      <input
+                        value={editForm.contactPerson ?? ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, contactPerson: e.target.value }))}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Remarks</label>
+                      <input value={editForm.remarks ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, remarks: e.target.value }))} />
+                    </div>
+                    <div className="panel-actions">
+                      <button className="btn-primary inline" onClick={saveEdit} disabled={rowActionSaving}>
+                        {rowActionSaving ? 'Saving…' : 'Save changes'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeAction === 'cancel' && (
+                  <div className="form-grid">
+                    <div className="field">
+                      <label>Reason (optional)</label>
+                      <input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+                    </div>
+                    <div className="panel-actions">
+                      <button className="btn-primary inline" onClick={submitCancel} disabled={rowActionSaving}>
+                        {rowActionSaving ? 'Cancelling…' : 'Cancel this stop'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(activeAction === 'postpone' || activeAction === 'reschedule') && (
+                  <div className="form-grid">
+                    <div className="field">
+                      <label>New date</label>
+                      <input
+                        type="date"
+                        value={dateForm.newDate ?? ''}
+                        onChange={(e) => setDateForm((f) => ({ ...f, newDate: e.target.value }))}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Reason (optional)</label>
+                      <input value={dateForm.reason ?? ''} onChange={(e) => setDateForm((f) => ({ ...f, reason: e.target.value }))} />
+                    </div>
+                    <div className="panel-actions">
+                      <button
+                        className="btn-primary inline"
+                        onClick={activeAction === 'postpone' ? submitPostpone : submitReschedule}
+                        disabled={rowActionSaving || !dateForm.newDate}
+                      >
+                        {rowActionSaving ? 'Saving…' : activeAction === 'postpone' ? 'Postpone' : 'Reschedule'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeAction === 'reassign' && (
+                  <div className="form-grid">
+                    <div className="field">
+                      <label>New supervisor</label>
+                      <select
+                        value={reassignSupervisorId}
+                        onChange={(e) => setReassignSupervisorId(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8 }}
+                      >
+                        <option value="">— select —</option>
+                        {(availableSupervisors ?? []).map((u) => (
+                          <option key={u.userId} value={u.userId}>
+                            {u.fullName} ({u.roleName})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Reason (optional)</label>
+                      <input value={reassignReason} onChange={(e) => setReassignReason(e.target.value)} />
+                    </div>
+                    <div className="panel-actions">
+                      <button className="btn-primary inline" onClick={submitReassign} disabled={rowActionSaving || !reassignSupervisorId}>
+                        {rowActionSaving ? 'Saving…' : 'Reassign'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeAction === 'history' && (
+                  <div>
+                    {rowHistory === null ? (
+                      <p className="subtitle">Loading…</p>
+                    ) : rowHistory.length === 0 ? (
+                      <p className="subtitle">No changes recorded yet for this stop.</p>
+                    ) : (
+                      <ul style={{ fontSize: 13, paddingLeft: 18 }}>
+                        {rowHistory.map((h) => (
+                          <li key={h.id} style={{ marginBottom: 6 }}>
+                            <strong>{h.action.replace('PJP_ROW_', '').replaceAll('_', ' ')}</strong> by {h.actorName ?? 'unknown user'} —{' '}
+                            {new Date(h.createdAt).toLocaleString()}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="panel-actions" style={{ marginTop: 16 }}>
             {canManage && openPjpDetail.status === 'DRAFT' && (
               <button className="btn-primary inline" onClick={() => publishPjp(openPjpDetail.id)} disabled={publishing}>
                 {publishing ? 'Publishing…' : 'Publish'}
               </button>
             )}
-            <button className="btn-secondary" onClick={() => setOpenPjpId(null)}>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                setOpenPjpId(null);
+                closeRowManagement();
+              }}
+            >
               Close
             </button>
           </div>

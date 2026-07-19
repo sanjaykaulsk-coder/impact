@@ -371,6 +371,49 @@ export interface PjpRowResponse {
   contactPerson: string | null;
   remarks: string | null;
   status: PjpRowStatus;
+  plannedSequence: number | null;
+  supervisorUserId: string | null;
+  supervisorName: string | null;
+}
+
+// -- PJP row management (S3.4: edit/cancel/postpone/reschedule/reassign, full change history) ---
+export interface UpdatePjpRowRequest {
+  locationName?: string;
+  latitude?: number;
+  longitude?: number;
+  contactPerson?: string;
+  remarks?: string;
+  plannedSequence?: number;
+  reason?: string;
+}
+
+export interface CancelPjpRowRequest {
+  reason?: string;
+}
+
+export interface PostponePjpRowRequest {
+  newDate: string;
+  reason?: string;
+}
+
+export interface ReschedulePjpRowRequest {
+  newDate: string;
+  reason?: string;
+}
+
+export interface ReassignPjpRowRequest {
+  supervisorUserId: string;
+  reason?: string;
+}
+
+export interface PjpRowHistoryEntry {
+  id: string;
+  action: string;
+  before: unknown;
+  after: unknown;
+  actorUserId: string | null;
+  actorName: string | null;
+  createdAt: string;
 }
 
 export interface PjpSummary {

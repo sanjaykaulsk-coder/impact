@@ -1,16 +1,51 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CreatePjpDto, PjpRowInputDto } from './dto/create-pjp.dto';
+import { CancelPjpRowDto, PostponePjpRowDto, ReassignPjpRowDto, ReschedulePjpRowDto } from './dto/pjp-row-actions.dto';
+import { UpdatePjpRowDto } from './dto/update-pjp-row.dto';
 
 interface RowValidationResult {
   rowIndex: number;
   reasons: string[];
 }
 
+const ROW_ENTITY_TYPE = 'PJPRow';
+
+/** Statuses that mean field work on this row has genuinely started or finished. */
+const LOCKED_INSTANCE_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'CLOSED'] as const;
+
 @Injectable()
 export class PjpService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /**
+   * Blocks edit/cancel/postpone/reschedule once field work has actually started or finished for
+   * this row — rewriting a stop's date or dropping it after someone has already checked in makes
+   * the field record inconsistent with what happened. Reassigning a supervisor is deliberately not
+   * gated by this (a mid-day handover is a legitimate real-world need).
+   */
+  private async assertRowEditable(tx: Prisma.TransactionClient, rowId: string) {
+    const lockedInstance = await tx.activityInstance.findFirst({
+      where: { pjpRowId: rowId, status: { in: [...LOCKED_INSTANCE_STATUSES] } },
+    });
+    if (lockedInstance) {
+      throw new BadRequestException(
+        'This stop already has field activity in progress or completed — it can no longer be edited, cancelled, postponed, or rescheduled.',
+      );
+    }
+  }
+
+  private async findRowOrThrow(tx: Prisma.TransactionClient, tenant: TenantContext, pjpId: string, rowId: string) {
+    const row = await tx.pJPRow.findFirst({ where: { id: rowId, pjpId, campaignId: tenant.campaignId } });
+    if (!row) throw new NotFoundException('PJP row not found');
+    return row;
+  }
 
   async findAll(tenant: TenantContext) {
     return this.prisma.runInTenantContext(tenant.clientId, (tx) =>
@@ -25,7 +60,18 @@ export class PjpService {
         include: { rows: { orderBy: { date: 'asc' } } },
       });
       if (!pjp) throw new NotFoundException('PJP not found');
-      return pjp;
+
+      // PJPRow.supervisorUserId is a plain scalar FK (no Prisma relation, same pattern as
+      // UserAssignment.userId) — names are resolved with a second query, same as AssignmentsService.
+      const supervisorIds = [...new Set(pjp.rows.map((r) => r.supervisorUserId).filter((id): id is string => !!id))];
+      const supervisors = supervisorIds.length
+        ? await tx.user.findMany({ where: { id: { in: supervisorIds } }, select: { id: true, fullName: true } })
+        : [];
+      const nameById = new Map(supervisors.map((u) => [u.id, u.fullName]));
+      return {
+        ...pjp,
+        rows: pjp.rows.map((r) => ({ ...r, supervisorName: r.supervisorUserId ? (nameById.get(r.supervisorUserId) ?? null) : null })),
+      };
     });
   }
 
@@ -168,6 +214,164 @@ export class PjpService {
       if (!pjp) throw new NotFoundException('PJP not found');
       if (pjp.status !== 'DRAFT') throw new BadRequestException(`Cannot publish a PJP in ${pjp.status} status`);
       return tx.pJP.update({ where: { id: pjpId }, data: { status: 'PUBLISHED', publishedAt: new Date() } });
+    });
+  }
+
+  /** Edits mutable, non-status fields — date-affecting actions go through postpone/reschedule instead. */
+  async updateRow(tenant: TenantContext, pjpId: string, rowId: string, dto: UpdatePjpRowDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const before = await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+      await this.assertRowEditable(tx, rowId);
+
+      const after = await tx.pJPRow.update({
+        where: { id: rowId },
+        data: {
+          ...(dto.locationName !== undefined ? { locationName: dto.locationName } : {}),
+          ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
+          ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
+          ...(dto.contactPerson !== undefined ? { contactPerson: dto.contactPerson } : {}),
+          ...(dto.remarks !== undefined ? { remarks: dto.remarks } : {}),
+          ...(dto.plannedSequence !== undefined ? { plannedSequence: dto.plannedSequence } : {}),
+        },
+      });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: tenant.userId,
+        action: 'PJP_ROW_EDITED',
+        entityType: ROW_ENTITY_TYPE,
+        entityId: rowId,
+        before,
+        after: { ...after, reason: dto.reason },
+      });
+      return after;
+    });
+  }
+
+  async cancelRow(tenant: TenantContext, pjpId: string, rowId: string, dto: CancelPjpRowDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const before = await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+      if (before.status === 'CANCELLED') throw new BadRequestException('This stop is already cancelled');
+      await this.assertRowEditable(tx, rowId);
+
+      const after = await tx.pJPRow.update({ where: { id: rowId }, data: { status: 'CANCELLED' } });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: tenant.userId,
+        action: 'PJP_ROW_CANCELLED',
+        entityType: ROW_ENTITY_TYPE,
+        entityId: rowId,
+        before,
+        after: { ...after, reason: dto.reason },
+      });
+      return after;
+    });
+  }
+
+  /** A short delay — same stop, same plan, pushed to a later date. See ReschedulePjpRowDto for the distinction. */
+  async postponeRow(tenant: TenantContext, pjpId: string, rowId: string, dto: PostponePjpRowDto) {
+    const newDate = new Date(dto.newDate);
+    if (Number.isNaN(newDate.getTime())) throw new BadRequestException('newDate is not a valid date');
+
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const before = await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+      await this.assertRowEditable(tx, rowId);
+
+      const after = await tx.pJPRow.update({ where: { id: rowId }, data: { status: 'POSTPONED', date: newDate } });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: tenant.userId,
+        action: 'PJP_ROW_POSTPONED',
+        entityType: ROW_ENTITY_TYPE,
+        entityId: rowId,
+        before,
+        after: { ...after, reason: dto.reason },
+      });
+      return after;
+    });
+  }
+
+  /** A plan change — may move date and/or sequence as part of a wider route restructure. */
+  async rescheduleRow(tenant: TenantContext, pjpId: string, rowId: string, dto: ReschedulePjpRowDto) {
+    const newDate = new Date(dto.newDate);
+    if (Number.isNaN(newDate.getTime())) throw new BadRequestException('newDate is not a valid date');
+
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const before = await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+      await this.assertRowEditable(tx, rowId);
+
+      const after = await tx.pJPRow.update({ where: { id: rowId }, data: { status: 'RESCHEDULED', date: newDate } });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: tenant.userId,
+        action: 'PJP_ROW_RESCHEDULED',
+        entityType: ROW_ENTITY_TYPE,
+        entityId: rowId,
+        before,
+        after: { ...after, reason: dto.reason },
+      });
+      return after;
+    });
+  }
+
+  /**
+   * Reassigns the row's responsible supervisor. Team reassignment is deliberately out of scope —
+   * there is no Team management module yet (no way to create one), so exposing a team picker here
+   * would be a dead-end control; logged as a known gap (A-056), not silently dropped.
+   */
+  async reassignRow(tenant: TenantContext, pjpId: string, rowId: string, dto: ReassignPjpRowDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const before = await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+
+      const membership = await tx.userCampaignRole.findFirst({
+        where: { userId: dto.supervisorUserId, campaignId: tenant.campaignId, status: 'ACTIVE' },
+      });
+      if (!membership) throw new BadRequestException('That user does not hold an active role in this campaign');
+
+      const after = await tx.pJPRow.update({ where: { id: rowId }, data: { supervisorUserId: dto.supervisorUserId } });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: tenant.userId,
+        action: 'PJP_ROW_REASSIGNED',
+        entityType: ROW_ENTITY_TYPE,
+        entityId: rowId,
+        before,
+        after: { ...after, reason: dto.reason },
+      });
+      return after;
+    });
+  }
+
+  async rowHistory(tenant: TenantContext, pjpId: string, rowId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      await this.findRowOrThrow(tx, tenant, pjpId, rowId);
+      const entries = await tx.auditLog.findMany({
+        where: { campaignId: tenant.campaignId, entityType: ROW_ENTITY_TYPE, entityId: rowId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const actorIds = [...new Set(entries.map((e) => e.actorUserId).filter((id): id is string => !!id))];
+      const actors = actorIds.length
+        ? await tx.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, fullName: true } })
+        : [];
+      const nameById = new Map(actors.map((u) => [u.id, u.fullName]));
+      return entries.map((e) => ({
+        id: e.id,
+        action: e.action,
+        before: e.beforeJson,
+        after: e.afterJson,
+        actorUserId: e.actorUserId,
+        actorName: e.actorUserId ? (nameById.get(e.actorUserId) ?? null) : null,
+        createdAt: e.createdAt,
+      }));
     });
   }
 }
