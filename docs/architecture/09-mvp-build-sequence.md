@@ -58,7 +58,9 @@ front-loading Stage 3.1's own scope. The Campaign SKU Master remains exactly whe
 - **S6.3 · Phase E (Prompt 5):** full validation — all test suites + all 7 acceptance scenarios with a pass/fail evidence table, **plus the report-format-library's migration acceptance test (§5) re-run against the final schema**.
 
 ## Post-MVP backlog (explicitly deferred, architecture-ready)
-Offline map corridors (module 13 full) · configurable dashboard engine for clients · perceptual duplicate detection · PDF/PPT reports · regional languages · AI image analysis · predictive features (Impact IQ side).
+Offline map corridors (module 13 full) · configurable dashboard engine for clients (client self-service KPI picker — distinct from S5.3's Impact-defined live dashboard/drill-down, which already covers cross-location, time-trend and deviation surfacing; see `docs/ASSUMPTIONS.md` A-058) · perceptual duplicate detection · PDF/PPT reports · regional languages · AI image analysis · predictive features (Impact IQ side).
+
+Also flagged in A-058, not yet assigned to a stage: saving a campaign's custom workflow + form combination back as a new, reusable master Activity Template (distinct from applying one of the existing 16 — that part already works, Stage 3.3).
 
 ## Total: ~19 Claude Code sessions to a validated MVP
 At 3–4 reviewed sessions per week, this is a 5–7 week build to Phase E — before the shadow pilot on a real campaign.
