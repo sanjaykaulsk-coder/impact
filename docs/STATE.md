@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE, founder-confirmed on real devices. Stage 3.1 (form builder full + SKU Master + reporting) — approved. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — the approve/reject/resubmit loop is founder-confirmed on the web admin (real reject → resubmit → approve cycle, tested via the no-phone simulator script). Full database security hardening (A-043's tenant-isolation gap) — DONE, founder-approved, verified.**
+**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 (workflow builder + milestone engine + SOP checklists) — APPROVED, founder personally confirmed the approve/reject/resubmit loop, the Workflow Builder screen, and the Readiness screen. Full database security hardening (A-043's tenant-isolation gap) — DONE, verified. Stage 3.3 (activity template library) — starting.**
 
 ## Database security hardening — full backstop closed (this session, founder decision)
 
@@ -417,12 +417,12 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 
 ## Open items for the founder
 1. Stage 2 (Sessions A, B, C) — **approved and confirmed on your real devices**
-2. Stage 3.1 (form builder + SKU Master + reporting) — **approved**, you said "start stage 3.2"
-3. **Stage 3.2 (workflow builder + SOP checklists) — the approve/reject/resubmit loop is confirmed.** You ran the full cycle on the web admin: a fresh Danapur Cantt Market submission → rejected with a reason → resubmitted → approved. Both Patna City Haat Ground and Danapur Cantt Market now sit correctly in Approved. The workflow-builder and SOP-checklist screens themselves (building a workflow, attaching a form to a milestone) are still worth a look when you have time — see "Reviewing Stage 3.2" below — but the core review loop this stage depends on is proven working.
-4. **Database security hardening — DONE.** You asked for a plain-language recommendation and chose "fix it now" — it's fixed, verified, and needs no action from you beyond the normal pull and rebuild before you test.
-5. **New: a no-phone testing tool exists now** (`backend/scripts/simulate-field-visit.mjs`) — plays a full field visit (or a resubmit) against your own backend without needing a phone in hand. Useful for future testing sessions too, not just this one.
+2. Stage 3.1 (form builder + SKU Master + reporting) — **approved**
+3. **Stage 3.2 (workflow builder + milestone engine + SOP checklists) — APPROVED**, 19 July 2026. You personally confirmed: the full reject → resubmit → approve loop on the web admin (Danapur Cantt Market, using the no-phone script to stand in for the field side); the Workflow Builder screen (attached a form to a milestone, added and saved a mandatory checklist item, added and saved a non-mandatory one, both survived a hard page reload); and the Readiness screen (correctly shows "no activities" for a date with nothing scheduled — working as designed, not broken).
+4. **Database security hardening — DONE.** You asked for a plain-language recommendation and chose "fix it now" — it's fixed and verified.
+5. **A no-phone testing tool exists now** (`backend/scripts/simulate-field-visit.mjs`, with a `--resubmit` mode) — plays a full field visit against your own backend without needing a phone in hand. Keep using it for future testing sessions.
 6. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-7. **Approve Stage 3.2, or request changes, before Stage 3.3 (activity template library) starts** — per process rules, this is a phase boundary
+7. **Stage 3.3 (activity template library) is starting now**, per your approval above
 
 ## How to see it yourself
 
