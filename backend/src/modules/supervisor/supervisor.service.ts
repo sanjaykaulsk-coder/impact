@@ -4,6 +4,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { DEVICE_RISK_SIGNAL_TYPES } from '../device-risk/device-risk.constants';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { DecideDeviationRequestDto } from './dto/decide-deviation-request.dto';
 
@@ -153,6 +154,98 @@ export class SupervisorService {
       });
 
       return updated;
+    });
+  }
+
+  /**
+   * Devices with an OPEN device-risk alert in this campaign (spec §18's "supervisor review
+   * queue"). Device itself is platform-scoped (no clientId — same posture as Role), but the
+   * Alerts DeviceRiskService writes are campaign-scoped, so the queue is naturally per-campaign
+   * even though the underlying Device row isn't.
+   */
+  async deviceRiskInbox(tenant: TenantContext) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const alerts = await tx.alert.findMany({
+        where: { campaignId: tenant.campaignId, status: 'OPEN', issueType: { in: DEVICE_RISK_SIGNAL_TYPES } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (alerts.length === 0) return [];
+
+      const deviceIds = [
+        ...new Set(alerts.map((a) => (a.evidenceJson as { deviceId?: string } | null)?.deviceId).filter((id): id is string => !!id)),
+      ];
+      const [devices, users] = await Promise.all([
+        tx.device.findMany({ where: { id: { in: deviceIds } } }),
+        tx.user.findMany({ where: { id: { in: alerts.map((a) => a.userId).filter((id): id is string => !!id) } }, select: { id: true, fullName: true } }),
+      ]);
+      const deviceById = new Map(devices.map((d) => [d.id, d]));
+      const nameById = new Map(users.map((u) => [u.id, u.fullName]));
+
+      return alerts.map((a) => {
+        const deviceId = (a.evidenceJson as { deviceId?: string } | null)?.deviceId ?? null;
+        const device = deviceId ? deviceById.get(deviceId) : undefined;
+        return {
+          alertId: a.id,
+          deviceId,
+          deviceModel: device?.deviceModel ?? null,
+          osVersion: device?.osVersion ?? null,
+          riskLevel: device?.riskLevel ?? null,
+          userFullName: a.userId ? (nameById.get(a.userId) ?? 'Unknown') : 'Unknown',
+          issueType: a.issueType,
+          severity: a.severity,
+          evidenceJson: a.evidenceJson,
+          createdAt: a.createdAt,
+        };
+      });
+    });
+  }
+
+  /** Resets a device back to L1 and resolves its open device-risk alerts — a supervisor's
+   * judgement call that whatever was flagged is explained/acceptable. */
+  async clearDeviceRisk(tenant: TenantContext, deviceId: string, actorUserId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const device = await tx.device.findUnique({ where: { id: deviceId } });
+      if (!device) throw new NotFoundException('Device not found');
+
+      await tx.device.update({ where: { id: deviceId }, data: { riskLevel: 'L1_WARNING', status: device.status === 'BLOCKED' ? 'ACTIVE' : device.status } });
+      await tx.alert.updateMany({
+        where: { campaignId: tenant.campaignId, status: 'OPEN', issueType: { in: DEVICE_RISK_SIGNAL_TYPES } },
+        data: { status: 'RESOLVED' },
+      });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId,
+        action: 'DEVICE_RISK_CLEARED',
+        entityType: 'Device',
+        entityId: deviceId,
+        before: { riskLevel: device.riskLevel, status: device.status },
+        after: { riskLevel: 'L1_WARNING', status: 'ACTIVE' },
+      });
+    });
+  }
+
+  /** Explicit, deliberate exclusion (spec §18: "L4 Blocked — user/device barred") — kept separate
+   * from the automatic signal system, which this session deliberately caps at L3 (see
+   * docs/ASSUMPTIONS.md), so a device is only ever fully barred by a human decision. */
+  async blockDevice(tenant: TenantContext, deviceId: string, actorUserId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const device = await tx.device.findUnique({ where: { id: deviceId } });
+      if (!device) throw new NotFoundException('Device not found');
+
+      await tx.device.update({ where: { id: deviceId }, data: { riskLevel: 'L4_BLOCKED', status: 'BLOCKED' } });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId,
+        action: 'DEVICE_BLOCKED',
+        entityType: 'Device',
+        entityId: deviceId,
+        before: { riskLevel: device.riskLevel, status: device.status },
+        after: { riskLevel: 'L4_BLOCKED', status: 'BLOCKED' },
+      });
     });
   }
 

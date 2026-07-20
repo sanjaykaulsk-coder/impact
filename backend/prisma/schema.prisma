@@ -554,6 +554,11 @@ model Campaign {
   endDate                  DateTime?
   deviationToleranceMeters Int            @default(250)
   mediaRequirementsJson    Json?
+  // Per-signal risk-level overrides (spec §18: "configurable risk levels"), e.g.
+  // {"DEVICE_TIME_MISMATCH": "L2_FLAGGED"} — signals not listed here fall back to
+  // DeviceRiskService's own defaults. Never hard-coded per client, same posture as every other
+  // *Json campaign config field.
+  deviceRiskRulesJson      Json?
   offlineMapRequired       Boolean        @default(false)
   clientVisibilityJson     Json?
   downloadRightsJson       Json?

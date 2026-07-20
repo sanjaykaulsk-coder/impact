@@ -64,7 +64,7 @@ export class ExecutionController {
     @CurrentTenant() tenant: TenantContext,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.execution.checkIn(tenant, activityInstanceId, user.id, dto);
+    return this.execution.checkIn(tenant, activityInstanceId, user.id, user.deviceId, dto);
   }
 
   // Camera-only evidence (spec §17): the app must never offer a gallery picker for this field —
@@ -136,7 +136,7 @@ export class ExecutionController {
     @CurrentTenant() tenant: TenantContext,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.execution.checkOut(tenant, activityInstanceId, user.id, dto);
+    return this.execution.checkOut(tenant, activityInstanceId, user.id, user.deviceId, dto);
   }
 
   @RequirePermissions('create')
@@ -172,7 +172,7 @@ export class ExecutionController {
     @CurrentTenant() tenant: TenantContext,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.execution.ingestGpsPoints(tenant, activityInstanceId, user.id, dto);
+    return this.execution.ingestGpsPoints(tenant, activityInstanceId, user.id, user.deviceId, dto);
   }
 
   @RequirePermissions('create')

@@ -19,6 +19,7 @@ import type {
   DecideApprovalRequest,
   DecideDeviationRequestRequest,
   DeviationRequestSummary,
+  DeviceRiskAlert,
   DfrReportResponse,
   FormTemplateDetail,
   FormTemplateSummary,
@@ -295,6 +296,11 @@ export const api = {
       request<DeviationRequestSummary>(`/campaigns/${campaignId}/supervisor/deviation-requests/${deviationRequestId}/escalate`, {
         method: 'POST',
       }),
+    deviceRiskInbox: (campaignId: string) => request<DeviceRiskAlert[]>(`/campaigns/${campaignId}/supervisor/device-risk`),
+    clearDeviceRisk: (campaignId: string, deviceId: string) =>
+      request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/clear`, { method: 'POST' }),
+    blockDevice: (campaignId: string, deviceId: string) =>
+      request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/block`, { method: 'POST' }),
   },
   workflow: {
     get: (campaignId: string) => request<WorkflowResponse | null>(`/campaigns/${campaignId}/workflow`),

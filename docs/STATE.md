@@ -1,8 +1,37 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, backend/admin half and phone half both confirmed. S4.2 (Device-risk controls, per the real build sequence) — starting.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, both halves confirmed. S4.2 (Device-risk controls) — built, all checks passing, awaiting founder review.**
 
-## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (this session, after founder approved Stage 4.1)
+## S4.2 — Device-risk controls (this session, after founder said "please go ahead")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S4.2 and spec §18: "personally owned phones;
+absolute prevention is impossible — implement risk detection, restriction and audit instead."
+
+- **The system now automatically notices two kinds of suspicious device behaviour** and does
+  something about it: a phone whose clock is significantly wrong, and a location reading that
+  looks manipulated (reusing the same "impossible jump" detection built for Stage 4.1). When
+  either happens, the device gets flagged at an escalating level — Warning → Flagged → Restricted
+  → Blocked — and a supervisor sees it on a new **Device Risk** page.
+- **A Restricted device is actually stopped** — it can't start or complete a field visit until a
+  supervisor looks at it and either clears it (back to normal) or blocks it outright (locks the
+  user out of that device entirely, reusing the device-blocking your team already had from day
+  one). This isn't just a warning label — verified live that check-out genuinely fails with a
+  clear message until a supervisor acts.
+- **Deliberately narrow scope, stated plainly**: the full spec lists 18 different things to watch
+  for — rooted phones, fake GPS apps, tampered app installs, screenshot evidence, and more. Most of
+  those need specialized phone-level detection code that's a substantial, separate effort (and,
+  like Stage 4.2's tracking work, genuinely can't be verified without real devices in hand) — not
+  attempted this session. What's built today catches two real, meaningful signals; the rest are a
+  known, tracked gap for a future session, not something quietly skipped. **Please don't assume a
+  rooted or tampered phone would be caught today — it wouldn't be, yet.**
+- **Verified**: backend and web build clean; full regression suite still 13/13; tested live against
+  a real running backend — a genuinely clock-skewed check-in correctly flagged a device, a
+  genuinely impossible GPS jump escalated it further to Restricted, a check-out attempt was
+  correctly blocked with a clear message, the device correctly appeared in the new Device Risk
+  page, "Clear" correctly un-blocked it and check-out then succeeded, and "Block" correctly
+  prevented that device from logging in again afterward.
+
+## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (previous session, after founder approved Stage 4.1)
 
 Per `docs/architecture/09-mvp-build-sequence.md` S4.1 and spec §14 — the phone-side half of the
 engine built last session.
@@ -568,7 +597,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
 10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED**, 20 July 2026. You personally confirmed: running the `--deviation` test script, seeing the resulting request appear on the new Deviations page with the right location/field-user/type, escalating it, and approving it with a comment — confirmed it correctly moved to the Approved tab.
 11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — APPROVED**, 20 July 2026. You tested on a real Android phone end to end: created a fresh test assignment for Rahul Kumar, checked in, confirmed a deviation reported from the phone appeared correctly on the web admin's Deviations page. This is the first Stage 4 piece confirmed on real hardware, not just code checks.
-12. **Note on stage numbering**: what this session called "Stage 4.2" was the phone-side half of Stage 4.1 (GPS/route/deviation), not the build plan's own numbered Stage 4.2. The next *build-sequence* stage is the real **S4.2: Device-risk controls** (signal collection, per-campaign risk rules, supervisor review queue) — nothing has been built for that yet. Flagging this now so the numbering in future updates matches `docs/architecture/09-mvp-build-sequence.md` exactly, not an ad-hoc session label.
+12. **Note on stage numbering**: what an earlier update called "Stage 4.2" was actually the phone-side half of Stage 4.1 (GPS/route/deviation). This entry (13) is the real, build-plan S4.2.
+13. **S4.2 (Device-risk controls) — built, all checks passing, awaiting your review.** See "Reviewing S4.2" below — no phone needed, the no-phone script has a new `--device-risk` mode. Please read the "deliberately narrow scope" note above before testing — this catches 2 of the 18 signals the full spec describes (clock mismatch, manipulated location), not rooted phones or tampered apps yet.
+14. **Approve S4.2, or request changes, before the next stage starts** — per process rules, this is a phase boundary.
 
 ## How to see it yourself
 
@@ -732,6 +763,29 @@ then everything else is in the browser.
    Check the Approved (or Rejected) tab to confirm it landed there.
 7. Optional: run the script again — it reuses the same Danapur visit, so you can generate another
    test deviation any time you want to re-test the screen.
+
+### Reviewing S4.2 — Device-risk controls
+
+Also the no-phone script, plus the web admin. No phone needed, and this one doesn't even need a
+check-in first.
+
+1. In a fresh Terminal tab: `cd ~/Desktop/impact-field-command && git pull origin claude/phase-c-foundation-sfqijm`
+2. Then: `node backend/scripts/simulate-field-visit.mjs --device-risk`
+   — this logs in as Rahul Kumar and sends two location readings that are 6.6km apart but only 10
+   seconds apart (physically impossible), which should flag his test device.
+3. In the browser, log in as Rohan Mehta (`9000000001`) and open the new **Device Risk** page.
+4. You should see the flagged device — Rahul Kumar, "Mock/manipulated location suspected," with a
+   current level of L3_RESTRICTED.
+5. Open **PJP Upload**, find any of Rahul's stops, and check its activity — if he tries to check in
+   or check out from that same (now-restricted) device, it should be refused with a clear message.
+   (The simplest way to see this: run `node backend/scripts/simulate-field-visit.mjs` — the full
+   version — right after step 2, and confirm the check-in step fails with a "restricted" message.)
+6. Back on the Device Risk page, try **Clear** — the device should disappear from the list.
+7. Re-run step 2 to flag it again, then try **Block** instead — this time, a login attempt for that
+   same device should be refused outright (same message you'd see for any blocked device).
+8. To undo the block afterward: the device stays visible on the Device Risk page even after
+   blocking (the underlying alert is still open) — click **Clear** on it and it goes back to
+   normal, unblocked and ready for the next test.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

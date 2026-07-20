@@ -87,4 +87,34 @@ export class SupervisorController {
   ) {
     return this.supervisor.escalateDeviation(tenant, deviationRequestId, user.id);
   }
+
+  // Gated on 'block' (not the controller default 'approve') — matches the existing "Device Risk"
+  // nav entry, spec's own permission for "Block a user or device".
+  @RequirePermissions('block')
+  @Get('device-risk')
+  deviceRiskInbox(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
+    return this.supervisor.deviceRiskInbox(tenant);
+  }
+
+  @RequirePermissions('block')
+  @Post('device-risk/:deviceId/clear')
+  clearDeviceRisk(
+    @Param('campaignId') _campaignId: string,
+    @Param('deviceId') deviceId: string,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.supervisor.clearDeviceRisk(tenant, deviceId, user.id);
+  }
+
+  @RequirePermissions('block')
+  @Post('device-risk/:deviceId/block')
+  blockDevice(
+    @Param('campaignId') _campaignId: string,
+    @Param('deviceId') deviceId: string,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.supervisor.blockDevice(tenant, deviceId, user.id);
+  }
 }

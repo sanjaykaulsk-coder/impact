@@ -617,6 +617,23 @@ export interface DecideDeviationRequestRequest {
   remarks?: string;
 }
 
+// -- Device-risk controls (S4.2, spec §18) --------------------------------------------------------
+export type RiskLevel = 'L1_WARNING' | 'L2_FLAGGED' | 'L3_RESTRICTED' | 'L4_BLOCKED';
+export type DeviceRiskSignalType = 'DEVICE_TIME_MISMATCH' | 'MOCK_LOCATION_SUSPECTED';
+
+export interface DeviceRiskAlert {
+  alertId: string;
+  deviceId: string | null;
+  deviceModel: string | null;
+  osVersion: string | null;
+  riskLevel: RiskLevel | null;
+  userFullName: string;
+  issueType: DeviceRiskSignalType | string;
+  severity: string;
+  evidenceJson: unknown;
+  createdAt: string;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stage 3.1 — Campaign SKU Master + reports (report-format-library §§1-3)
 // ---------------------------------------------------------------------------------------------

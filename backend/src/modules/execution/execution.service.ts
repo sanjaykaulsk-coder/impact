@@ -6,6 +6,8 @@ import { postgisDistanceMeters } from '../../core/geo/postgis-distance';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { DeviceRiskService } from '../device-risk/device-risk.service';
+import { DEVICE_TIME_MISMATCH_THRESHOLD_MS } from '../device-risk/device-risk.constants';
 import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
 import { GpsPointDto, IngestGpsPointsDto } from './dto/ingest-gps-points.dto';
@@ -43,6 +45,7 @@ export class ExecutionService {
     private readonly prisma: PrismaService,
     private readonly media: MediaStorageService,
     private readonly audit: AuditService,
+    private readonly deviceRisk: DeviceRiskService,
   ) {}
 
   private assertOwnership(activity: { assignedUserId: string | null }, userId: string) {
@@ -142,7 +145,7 @@ export class ExecutionService {
     });
   }
 
-  async checkIn(tenant: TenantContext, activityInstanceId: string, userId: string, dto: GpsEventDto) {
+  async checkIn(tenant: TenantContext, activityInstanceId: string, userId: string, deviceId: string, dto: GpsEventDto) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const activity = await tx.activityInstance.findUniqueOrThrow({
         where: { id: activityInstanceId },
@@ -153,6 +156,9 @@ export class ExecutionService {
         },
       });
       this.assertOwnership(activity, userId);
+      // spec §18: a device already restricted/blocked cannot start or complete an activity until
+      // a supervisor acts — checked before any of this request's own effects, not after.
+      await this.deviceRisk.checkEnforcement(tx, deviceId);
 
       const existing = await tx.checkIn.findFirst({ where: { activityInstanceId } });
       if (existing) return { checkIn: existing, alreadyCheckedIn: true };
@@ -196,6 +202,19 @@ export class ExecutionService {
         await tx.activityInstance.update({
           where: { id: activityInstanceId },
           data: { status: 'IN_PROGRESS', actualStartAt: new Date() },
+        });
+      }
+
+      // spec §18: "device-time manipulation, server-time mismatch" — a phone's clock far from the
+      // server's own is a real signal, computed here since this is the first call site that has
+      // both a device-reported timestamp and the server's own clock side by side.
+      const timeDiffMs = Math.abs(checkIn.serverTimestamp.getTime() - checkIn.deviceTimestamp.getTime());
+      if (timeDiffMs > DEVICE_TIME_MISMATCH_THRESHOLD_MS) {
+        await this.deviceRisk.recordSignal(tx, tenant, deviceId, 'DEVICE_TIME_MISMATCH', {
+          activityInstanceId,
+          deviceTimestamp: checkIn.deviceTimestamp,
+          serverTimestamp: checkIn.serverTimestamp,
+          diffMs: timeDiffMs,
         });
       }
 
@@ -565,10 +584,11 @@ export class ExecutionService {
     }
   }
 
-  async checkOut(tenant: TenantContext, activityInstanceId: string, userId: string, dto: GpsEventDto) {
+  async checkOut(tenant: TenantContext, activityInstanceId: string, userId: string, deviceId: string, dto: GpsEventDto) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const bundle = await this.loadBundle(tx, activityInstanceId);
       this.assertOwnership(bundle.activity, userId);
+      await this.deviceRisk.checkEnforcement(tx, deviceId);
 
       if (!bundle.checkIn) throw new BadRequestException('Check in before checking out');
       const requiredPhotos = bundle.milestone?.mandatoryPhotoCount ?? 0;
@@ -686,7 +706,7 @@ export class ExecutionService {
    * this is intentionally the server-side half only; nothing in this codebase yet streams points
    * continuously from the device (see docs/ASSUMPTIONS.md A-059).
    */
-  async ingestGpsPoints(tenant: TenantContext, activityInstanceId: string, userId: string, dto: IngestGpsPointsDto) {
+  async ingestGpsPoints(tenant: TenantContext, activityInstanceId: string, userId: string, deviceId: string, dto: IngestGpsPointsDto) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const activity = await tx.activityInstance.findUniqueOrThrow({
         where: { id: activityInstanceId },
@@ -710,6 +730,7 @@ export class ExecutionService {
       }[] = [];
 
       let previous: GpsPointDto | null = null;
+      let anyMockLocationSuspected = false;
       for (const point of sorted) {
         const distanceFromPlannedMeters =
           plannedLat != null && plannedLng != null
@@ -747,6 +768,9 @@ export class ExecutionService {
           });
         }
 
+        const isMockLocationSuspected = (point.isMockLocationSuspected ?? false) || suspectedManipulation;
+        if (isMockLocationSuspected) anyMockLocationSuspected = true;
+
         await tx.gPSPoint.create({
           data: {
             clientId: tenant.clientId,
@@ -759,7 +783,7 @@ export class ExecutionService {
             accuracyMeters: point.accuracyMeters,
             speedKmh: point.speedKmh,
             distanceFromPlannedMeters,
-            isMockLocationSuspected: (point.isMockLocationSuspected ?? false) || suspectedManipulation,
+            isMockLocationSuspected,
             recordedAt: new Date(point.recordedAt),
           },
         });
@@ -777,6 +801,13 @@ export class ExecutionService {
           suspectedManipulation,
         });
         previous = point;
+      }
+
+      if (anyMockLocationSuspected) {
+        await this.deviceRisk.recordSignal(tx, tenant, deviceId, 'MOCK_LOCATION_SUSPECTED', {
+          activityInstanceId,
+          routeTraceId: trace?.id ?? null,
+        });
       }
 
       return { routeTraceId: trace?.id ?? null, toleranceMeters: campaign.deviationToleranceMeters, points: results };

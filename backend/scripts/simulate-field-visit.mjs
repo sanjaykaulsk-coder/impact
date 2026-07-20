@@ -11,6 +11,9 @@
 //   --deviation  logs in, checks in if needed, sends a GPS reading well outside the campaign's
 //                tolerance, and submits a deviation request — puts a fresh item in the new
 //                Deviations page, Pending review tab (Stage 4.1).
+//   --device-risk  logs in, sends two GPS readings 6.6km apart 10 seconds apart (an impossible
+//                  jump) to flag the test device — puts a fresh item on the Device Risk page
+//                  (S4.2). Safe to re-run any time, doesn't need a check-in first.
 //
 // Uses Rahul Kumar's seeded login (9000000009) and his Danapur Cantt Market assignment. The photo
 // is an obviously synthetic solid-colour test image generated on the fly — not a real photograph,
@@ -176,12 +179,65 @@ async function deviationOnly() {
   console.log('now be in the Deviations page, Pending review tab — refresh it in your browser to see it.');
 }
 
+async function deviceRiskOnly() {
+  log('1/3', `Requesting OTP for ${MOBILE_NUMBER}...`);
+  const otp = await api('/auth/otp/request', { method: 'POST', body: { mobileNumber: MOBILE_NUMBER } });
+  if (!otp.devOtpCode) throw new Error('No dev OTP code returned — is OTP_PROVIDER set to something other than "mock"?');
+
+  log('2/3', 'Verifying OTP and logging in...');
+  const auth = await api('/auth/otp/verify', {
+    method: 'POST',
+    body: {
+      challengeId: otp.challengeId,
+      code: otp.devOtpCode,
+      device: { fingerprint: DEVICE_FINGERPRINT, model: 'Simulated test device', osVersion: 'N/A', appVersion: 'script' },
+    },
+  });
+  const token = auth.accessToken;
+  log('2/3', `Logged in as ${auth.user.fullName}.`);
+
+  const assignments = await api('/me/assignments', { token });
+  const assignment = assignments.find((a) => a.pjpRow?.locationName === TARGET_LOCATION);
+  if (!assignment) {
+    throw new Error(
+      `No assignment found for "${TARGET_LOCATION}" — it may already be checked out, or the seed data has changed.`,
+    );
+  }
+  const campaignId = assignment.campaign.id;
+  const lat = Number(assignment.pjpRow.latitude);
+  const lng = Number(assignment.pjpRow.longitude);
+
+  log('3/3', 'Sending two GPS readings 6.6km apart, 10 seconds apart (an impossible jump)...');
+  // GPS ingestion works whether or not the activity is checked in/out (see Stage 4.2's device-risk
+  // service — it deliberately doesn't gate telemetry, only starting/completing the activity), so
+  // this doesn't need check-in first and can be re-run any time to generate a fresh test signal.
+  const bundle = await api(`/campaigns/${campaignId}/assignments/${assignment.id}/activity`, { token });
+  const activityId = bundle.activity.id;
+  const now = Date.now();
+  await api(`/campaigns/${campaignId}/activity-instances/${activityId}/gps-points`, {
+    method: 'POST',
+    token,
+    body: {
+      points: [
+        { latitude: lat, longitude: lng, accuracyMeters: 8, speedKmh: 5, recordedAt: new Date(now).toISOString() },
+        { latitude: lat + 0.06, longitude: lng + 0.06, accuracyMeters: 10, speedKmh: 8, recordedAt: new Date(now + 10000).toISOString() },
+      ],
+    },
+  });
+
+  console.log('\nDone. This device should now be flagged — open the Device Risk page in the web');
+  console.log('admin (needs the "block" permission, e.g. log in as Rohan Mehta) to review it.');
+}
+
 async function main() {
   if (process.argv.includes('--resubmit')) {
     return resubmitOnly();
   }
   if (process.argv.includes('--deviation')) {
     return deviationOnly();
+  }
+  if (process.argv.includes('--device-risk')) {
+    return deviceRiskOnly();
   }
 
   log('1/7', `Requesting OTP for ${MOBILE_NUMBER}...`);

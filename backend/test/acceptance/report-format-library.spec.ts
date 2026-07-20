@@ -41,10 +41,10 @@ const prismaService = new PrismaService();
 const formsService = new FormsService(prismaService);
 const skusService = new SkusService(prismaService);
 const reportsService = new ReportsService(prismaService);
-// ExecutionService's storage and audit dependencies are only used by the media/GPS/deviation
-// endpoints, which this suite never touches — submitMilestoneResponse (the path under test) needs
-// neither.
-const executionService = new ExecutionService(prismaService, undefined as never, undefined as never);
+// ExecutionService's storage, audit, and device-risk dependencies are only used by the
+// media/GPS/deviation endpoints, which this suite never touches — submitMilestoneResponse (the
+// path under test) needs none of them.
+const executionService = new ExecutionService(prismaService, undefined as never, undefined as never, undefined as never);
 
 const RUN_TAG = `acc-${Date.now().toString(36)}`;
 
