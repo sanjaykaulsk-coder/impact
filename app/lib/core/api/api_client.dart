@@ -41,6 +41,16 @@ class ApiClient {
   final String baseUrl;
   final http.Client _http;
 
+  // Refresh tokens rotate server-side (token.service.ts's rotate(): each use revokes the
+  // presented token and issues a fresh pair). The home screen fires several requests at once on
+  // load (branding, assignments, attendance) — if more than one hits a 401 around the same
+  // moment, each would otherwise read the same soon-to-be-stale refresh token and race
+  // independently to call it: whichever loses presents an already-used token, fails, and clears
+  // the token store — wiping out the winner's just-issued valid pair and silently signing the
+  // user out (exactly the race found and fixed on the web admin, A-064). This shared in-flight
+  // future makes every concurrent 401 await the same single refresh attempt instead.
+  Future<bool>? _refreshInFlight;
+
   ApiClient({required this.tokenStore, String? baseUrl, http.Client? client})
       : baseUrl = baseUrl ?? _defaultBaseUrl(),
         _http = client ?? http.Client();
@@ -92,7 +102,11 @@ class ApiClient {
     throw ApiException(res.statusCode, message);
   }
 
-  Future<bool> _tryRefresh() async {
+  Future<bool> _tryRefresh() {
+    return _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);
+  }
+
+  Future<bool> _doRefresh() async {
     final refresh = await tokenStore.refreshToken;
     if (refresh == null) return false;
     try {
