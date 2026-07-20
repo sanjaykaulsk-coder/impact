@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, awaiting founder review (real-device testing needed — see below).**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, HOLDING pending founder's real-device test. No further build work proceeds until tested and approved.**
 
 ## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (this session, after founder approved Stage 4.1)
 
@@ -567,7 +567,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
 10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED**, 20 July 2026. You personally confirmed: running the `--deviation` test script, seeing the resulting request appear on the new Deviations page with the right location/field-user/type, escalating it, and approving it with a comment — confirmed it correctly moved to the Approved tab.
-11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, but genuinely cannot be confirmed working without a phone.** Every automatic check available caught nothing wrong, but that's a lower bar than for previous stages — this is phone-only code with no web/no-phone-script equivalent to stand in for it. **Decision for you**: approve based on the code checks passing and confirm for real whenever a phone becomes available, or hold this stage open until you have a phone/emulator to test it properly first. Either is fine — just tell me which.
+11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, HOLDING for real-device testing.** You chose to arrange a phone and test properly before approving, rather than approve on code checks alone — the right call for phone-only work like this. No further build work proceeds past this stage until you've tested it and given the go-ahead; picking this back up is just a matter of you saying so once a phone is in hand.
 
 ## How to see it yourself
 
