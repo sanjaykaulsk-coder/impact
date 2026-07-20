@@ -1,6 +1,27 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, both halves confirmed. S4.2 (Device-risk controls) — APPROVED, 20 July 2026. The founder hit and confirmed a real bug during testing (Device Risk Clear/Block failing); root-caused, fixed, and the founder personally confirmed "It works now" on their own machine. Awaiting founder go-ahead to start S4.3 (Sales & stock reconciliation + attendance) — phase boundary, per process rules.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1 GPS/route/deviation, 4.2 Device-risk controls) — ALL APPROVED. S4.3 (Sales & stock reconciliation + Attendance) — built, all checks passing, awaiting founder review.**
+
+## S4.3 — Sales & stock reconciliation + Attendance (this session, after founder said "please go ahead")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S4.3: "Sales & stock — SKU reporting, reconciliation formula, mismatch exceptions. Attendance day-start/day-end."
+
+- **A survey before building turned up that most of this was already done.** SKU-level stock reporting and the reconciliation formula (Opening + Received − Sold − Sampled − Damaged, compared against the actual physical count) were built back in Stage 3.1. What this session found, that hadn't been called out before: **the "mismatch generates an exception" part was also already built**, in that same Stage 3.1 work — the moment a field visit reports an actual closing-stock count that doesn't match the formula, the system already quietly records it as an internal exception. There's no supervisor screen to *see* that list yet (that's a later, dedicated stage — the full Exceptions inbox), but the underlying detection and recording has been working correctly since Stage 3.1. This was a documentation gap, not a missing feature — logged and corrected.
+- **The one genuinely new piece this session: Attendance (day-start / day-end).** A field worker's phone app now has a simple "Start my day" / "End my day" card on its home screen — independent of any specific visit or location. Tapping it records the time (and GPS, if available — it won't block you if your phone's location is off, unlike check-in for an actual visit). The system won't let you start your day twice, or end a day you never started, or end it twice.
+- **Deliberately no web admin page for Attendance yet** — the full Supervisor module (attendance rosters, unsynced users, team performance, etc.) is its own dedicated future stage, and building one screen from it early would be exactly the kind of half-finished, out-of-order work this project avoids. For now, Attendance is something the field worker sees on their own phone; a supervisor view comes later, as one part of that larger module.
+- **Verified**: backend and web builds clean; full backend test suite still 13/13; `flutter analyze` 0 issues. All three new endpoints tested live end-to-end: a fresh day correctly shows nothing marked; starting the day records it and returns the time; trying to start twice is correctly refused; ending a day before starting it is correctly refused; ending the day records it; trying to end twice is correctly refused. The no-phone testing script has a new `--attendance` mode. QA grep clean.
+
+### Reviewing S4.3 — Sales & stock reconciliation + Attendance
+
+The stock reconciliation half needs no new testing — it's been working since Stage 3.1 (see the Reports page). The new piece to test is Attendance, and the best way is on your own phone, not the no-phone script.
+
+1. On your phone: `git pull` isn't needed there — just make sure your backend is up to date (`git pull` on your computer, then restart with `./scripts/bootstrap.sh`).
+2. Open the app on your phone and go to the home screen (where you see "Today's assignments").
+3. You should see a new card near the top: "You haven't started your day yet" with a **Start my day** button.
+4. Tap it. The card should update to show the time you started.
+5. The button should now say **End my day**. Tap it, and the card should show both the start and end time.
+6. Close and reopen the app (or pull down to refresh) — the times should still be there; they don't reset until the next calendar day.
+7. If you don't have your phone handy: `node backend/scripts/simulate-field-visit.mjs --attendance` marks the next step (start, then end, on separate runs) and prints the result in the terminal — there's no web page to see it on yet, so the phone is the real test.
 
 ## S4.2 — Device-risk controls (this session, after founder said "please go ahead")
 
@@ -603,8 +624,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 13. **S4.2 (Device-risk controls) — built, all checks passing, awaiting your review.** See "Reviewing S4.2" below — no phone needed, the no-phone script has a new `--device-risk` mode. Please read the "deliberately narrow scope" note above before testing — this catches 2 of the 18 signals the full spec describes (clock mismatch, manipulated location), not rooted phones or tampered apps yet.
 14. **Approve S4.2, or request changes, before the next stage starts** — per process rules, this is a phase boundary.
 15. **Bug you found while testing S4.2, "Could not clear this device" on the Device Risk page — fixed and personally confirmed working by you ("It works now"), 20 July 2026.** The first fix (a login-session timing issue) was real but didn't fully explain what you were hitting. The actual cause: the device really was being cleared/blocked correctly every single time, but the app showed an error anyway because of how it read the server's (empty, but successful) response. Fixed, verified with a live run before pushing, and now confirmed on your own machine too.
-16. **S4.2 (Device-risk controls) is now fully APPROVED** — built, bug found during your testing, fixed, and confirmed working. This closes Stage 4 entirely (S4.1 + S4.2 both approved).
-17. **Next up per the build sequence: S4.3 — Sales & stock reconciliation + attendance** (builds on the SKU/movement tables already in place from S3.1, adds day-start/day-end attendance). **This is a phase boundary — waiting for your go-ahead before starting**, per the standing process rule.
+16. **S4.2 (Device-risk controls) is now fully APPROVED** — built, bug found during your testing, fixed, and confirmed working.
+17. **Correction to item 16**: Stage 4 actually has three parts per the build plan (S4.1, S4.2, S4.3), not two — S4.3 was still open, not a separate later stage. You said "Please go ahead" and S4.3 has now been built (see below); Stage 4 is only fully closed once you approve this too.
+18. **S4.3 (Sales & stock reconciliation + Attendance) — built, all checks passing, awaiting your review.** See "Reviewing S4.3" above. Good news found along the way: the "mismatch generates an exception" part of stock reconciliation was actually already working since Stage 3.1 — just never called out clearly before. The one genuinely new piece is Attendance (day-start/day-end), best tested on your phone.
+19. **Approve S4.3, or request changes, before the next stage starts** — per process rules, this is a phase boundary. Once approved, Stage 4 (4.1 + 4.2 + 4.3) is fully closed.
 
 ## How to see it yourself
 

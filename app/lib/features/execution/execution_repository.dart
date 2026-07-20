@@ -170,4 +170,26 @@ class ExecutionRepository {
     });
     return DeviationRequestRecord.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Today's day-start/day-end status (S4.3, spec §34) — independent of any specific assignment.
+  Future<TodayAttendance> todayAttendance(String campaignId) async {
+    final json = await api.get('/campaigns/$campaignId/attendance/today');
+    return TodayAttendance.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<AttendanceRecord> markDayStart(String campaignId, {double? latitude, double? longitude}) async {
+    final json = await api.post('/campaigns/$campaignId/attendance/day-start', {
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    });
+    return AttendanceRecord.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<AttendanceRecord> markDayEnd(String campaignId, {double? latitude, double? longitude}) async {
+    final json = await api.post('/campaigns/$campaignId/attendance/day-end', {
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    });
+    return AttendanceRecord.fromJson(json as Map<String, dynamic>);
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/models.dart';
+import '../../core/location/get_current_position.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
@@ -18,7 +19,9 @@ class CampaignHomeScreen extends ConsumerStatefulWidget {
 class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
   Future<CampaignBrandingResponse>? _brandingFuture;
   Future<List<MyAssignment>>? _assignmentsFuture;
+  Future<TodayAttendance>? _attendanceFuture;
   String? _loadedForCampaignId;
+  bool _attendanceBusy = false;
 
   void _reloadAssignments(String campaignId) {
     setState(() {
@@ -26,6 +29,44 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
             (all) => all.where((a) => a.campaignId == campaignId).toList(),
           );
     });
+  }
+
+  void _reloadAttendance(String campaignId) {
+    setState(() {
+      _attendanceFuture = ref.read(executionRepositoryProvider).todayAttendance(campaignId);
+    });
+  }
+
+  Future<void> _markAttendance(String campaignId, {required bool isDayStart}) async {
+    setState(() => _attendanceBusy = true);
+    try {
+      // Best-effort GPS — attendance is a lightweight day marker, not a field visit, so a denied
+      // permission or a location-services hiccup shouldn't block marking it.
+      double? latitude;
+      double? longitude;
+      try {
+        final position = await getCurrentPositionOrThrow();
+        latitude = position.latitude;
+        longitude = position.longitude;
+      } catch (_) {
+        // proceed without GPS
+      }
+      final repo = ref.read(executionRepositoryProvider);
+      if (isDayStart) {
+        await repo.markDayStart(campaignId, latitude: latitude, longitude: longitude);
+      } else {
+        await repo.markDayEnd(campaignId, latitude: latitude, longitude: longitude);
+      }
+      _reloadAttendance(campaignId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isDayStart ? 'Could not start your day: $e' : 'Could not end your day: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _attendanceBusy = false);
+    }
   }
 
   @override
@@ -46,6 +87,7 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
       _assignmentsFuture = ref.read(executionRepositoryProvider).myAssignments().then(
             (all) => all.where((a) => a.campaignId == campaignId).toList(),
           );
+      _attendanceFuture = ref.read(executionRepositoryProvider).todayAttendance(campaignId);
     }
 
     MyCampaignSummary? membership;
@@ -119,6 +161,22 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
                 _InfoTile(label: 'Role', value: membership?.roleName ?? ''),
                 if (branding.escalationContactName != null)
                   _InfoTile(label: 'Escalation contact', value: branding.escalationContactName!),
+                const SizedBox(height: 16),
+                FutureBuilder<TodayAttendance>(
+                  future: _attendanceFuture,
+                  builder: (context, attendanceSnapshot) {
+                    final today = attendanceSnapshot.data;
+                    return _AttendanceCard(
+                      primary: primary,
+                      loading: attendanceSnapshot.connectionState != ConnectionState.done,
+                      busy: _attendanceBusy,
+                      dayStart: today?.dayStart,
+                      dayEnd: today?.dayEnd,
+                      onStartDay: () => _markAttendance(campaignId, isDayStart: true),
+                      onEndDay: () => _markAttendance(campaignId, isDayStart: false),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
                 Text('Today\'s assignments', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
@@ -223,6 +281,66 @@ class _InfoTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+String _formatTime(String isoTimestamp) {
+  final t = DateTime.parse(isoTimestamp).toLocal();
+  final hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
+  final minute = t.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${t.hour < 12 ? 'AM' : 'PM'}';
+}
+
+// Day-start/day-end attendance (S4.3) — independent of any specific assignment, so it lives on the
+// home screen rather than on an activity's detail screen.
+class _AttendanceCard extends StatelessWidget {
+  final Color primary;
+  final bool loading;
+  final bool busy;
+  final AttendanceRecord? dayStart;
+  final AttendanceRecord? dayEnd;
+  final VoidCallback onStartDay;
+  final VoidCallback onEndDay;
+
+  const _AttendanceCard({
+    required this.primary,
+    required this.loading,
+    required this.busy,
+    required this.dayStart,
+    required this.dayEnd,
+    required this.onStartDay,
+    required this.onEndDay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: loading
+          ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 8), child: CircularProgressIndicator()))
+          : Row(
+              children: [
+                Icon(Icons.access_time, color: primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: dayStart == null
+                      ? const Text('You haven\'t started your day yet')
+                      : dayEnd == null
+                          ? Text('Day started at ${_formatTime(dayStart!.checkTime)}')
+                          : Text('Day started ${_formatTime(dayStart!.checkTime)} · ended ${_formatTime(dayEnd!.checkTime)}'),
+                ),
+                if (dayStart == null)
+                  ElevatedButton(onPressed: busy ? null : onStartDay, child: Text(busy ? 'Working…' : 'Start my day'))
+                else if (dayEnd == null)
+                  ElevatedButton(onPressed: busy ? null : onEndDay, child: Text(busy ? 'Working…' : 'End my day')),
+              ],
+            ),
     );
   }
 }

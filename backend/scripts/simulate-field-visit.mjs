@@ -14,6 +14,11 @@
 //   --device-risk  logs in, sends two GPS readings 6.6km apart 10 seconds apart (an impossible
 //                  jump) to flag the test device — puts a fresh item on the Device Risk page
 //                  (S4.2). Safe to re-run any time, doesn't need a check-in first.
+//   --attendance   logs in and marks day-start (or day-end, if day-start is already marked today)
+//                  — there's no web admin page for this yet (S4.3 deliberately scoped that to a
+//                  later supervisor-module session), so this just prints the result; the real way
+//                  to see it is the "Start my day" / "End my day" card on the phone app's home
+//                  screen. Doesn't need an assignment or check-in at all.
 //
 // Uses Rahul Kumar's seeded login (9000000009) and his Danapur Cantt Market assignment. The photo
 // is an obviously synthetic solid-colour test image generated on the fly — not a real photograph,
@@ -229,6 +234,42 @@ async function deviceRiskOnly() {
   console.log('admin (needs the "block" permission, e.g. log in as Rohan Mehta) to review it.');
 }
 
+async function attendanceOnly() {
+  log('1/3', `Requesting OTP for ${MOBILE_NUMBER}...`);
+  const otp = await api('/auth/otp/request', { method: 'POST', body: { mobileNumber: MOBILE_NUMBER } });
+  if (!otp.devOtpCode) throw new Error('No dev OTP code returned — is OTP_PROVIDER set to something other than "mock"?');
+
+  log('2/3', 'Verifying OTP and logging in...');
+  const auth = await api('/auth/otp/verify', {
+    method: 'POST',
+    body: {
+      challengeId: otp.challengeId,
+      code: otp.devOtpCode,
+      device: { fingerprint: DEVICE_FINGERPRINT, model: 'Simulated test device', osVersion: 'N/A', appVersion: 'script' },
+    },
+  });
+  const token = auth.accessToken;
+  log('2/3', `Logged in as ${auth.user.fullName}.`);
+
+  const assignments = await api('/me/assignments', { token });
+  const campaignId = assignments[0]?.campaign?.id;
+  if (!campaignId) throw new Error('Could not find a campaign for this user — is the seed data intact?');
+
+  log('3/3', 'Checking today\'s attendance and marking the next step...');
+  const today = await api(`/campaigns/${campaignId}/attendance/today`, { token });
+  if (!today.dayStart) {
+    const result = await api(`/campaigns/${campaignId}/attendance/day-start`, { method: 'POST', token, body: {} });
+    console.log(`\nDone. Day started at ${result.checkTime}.`);
+  } else if (!today.dayEnd) {
+    const result = await api(`/campaigns/${campaignId}/attendance/day-end`, { method: 'POST', token, body: {} });
+    console.log(`\nDone. Day started at ${today.dayStart.checkTime}, ended at ${result.checkTime}.`);
+  } else {
+    console.log(`\nAlready marked for today: started ${today.dayStart.checkTime}, ended ${today.dayEnd.checkTime}.`);
+  }
+  console.log('There\'s no web admin page for this yet — the real way to see it is the "Start my');
+  console.log('day" / "End my day" card on the phone app\'s home screen.');
+}
+
 async function main() {
   if (process.argv.includes('--resubmit')) {
     return resubmitOnly();
@@ -238,6 +279,9 @@ async function main() {
   }
   if (process.argv.includes('--device-risk')) {
     return deviceRiskOnly();
+  }
+  if (process.argv.includes('--attendance')) {
+    return attendanceOnly();
   }
 
   log('1/7', `Requesting OTP for ${MOBILE_NUMBER}...`);

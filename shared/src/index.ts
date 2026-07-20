@@ -832,3 +832,27 @@ export interface ActivityTemplateSummary {
 export interface ApplyActivityTemplateRequest {
   activityTemplateId: string;
 }
+
+// ---------------------------------------------------------------------------------------------
+// S4.3 — Attendance day-start/day-end (spec §34's Attendance model, build sequence S4.3)
+// ---------------------------------------------------------------------------------------------
+
+export type AttendanceType = 'DAY_START' | 'DAY_END';
+
+export interface AttendanceRecord {
+  id: string;
+  type: AttendanceType;
+  checkTime: string;
+  latitude: string | null;
+  longitude: string | null;
+}
+
+export interface TodayAttendanceResponse {
+  dayStart: AttendanceRecord | null;
+  dayEnd: AttendanceRecord | null;
+}
+
+export interface MarkAttendanceRequest {
+  latitude?: number;
+  longitude?: number;
+}

@@ -398,3 +398,31 @@ class DeviationRequestRecord {
         status: json['status'] as String,
       );
 }
+
+// Day-start/day-end attendance marker (S4.3, spec §34's Attendance model) — independent of any
+// specific assignment, one DAY_START and one DAY_END per user per campaign per calendar day.
+class AttendanceRecord {
+  final String id;
+  final String type;
+  final String checkTime;
+
+  AttendanceRecord({required this.id, required this.type, required this.checkTime});
+
+  factory AttendanceRecord.fromJson(Map<String, dynamic> json) => AttendanceRecord(
+        id: json['id'] as String,
+        type: json['type'] as String,
+        checkTime: json['checkTime'] as String,
+      );
+}
+
+class TodayAttendance {
+  final AttendanceRecord? dayStart;
+  final AttendanceRecord? dayEnd;
+
+  TodayAttendance({this.dayStart, this.dayEnd});
+
+  factory TodayAttendance.fromJson(Map<String, dynamic> json) => TodayAttendance(
+        dayStart: json['dayStart'] != null ? AttendanceRecord.fromJson(json['dayStart'] as Map<String, dynamic>) : null,
+        dayEnd: json['dayEnd'] != null ? AttendanceRecord.fromJson(json['dayEnd'] as Map<String, dynamic>) : null,
+      );
+}
