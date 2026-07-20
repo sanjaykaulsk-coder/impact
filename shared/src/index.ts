@@ -549,6 +549,74 @@ export interface DecideApprovalRequest {
   remarks?: string;
 }
 
+// -- GPS/route/deviation engine (Stage 4.1, spec §14) --------------------------------------------
+export type DeviationType =
+  | 'OUTSIDE_PERMITTED_RADIUS'
+  | 'UNPLANNED_LOCATION'
+  | 'SKIPPED_LOCATION'
+  | 'WRONG_SEQUENCE'
+  | 'LATE_ARRIVAL'
+  | 'EARLY_DEPARTURE'
+  | 'UNPLANNED_STOPPAGE'
+  | 'GPS_DISABLED'
+  | 'ABNORMAL_SPEED'
+  | 'SUSPECTED_LOCATION_MANIPULATION';
+
+export interface GpsPointInput {
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+  speedKmh?: number;
+  isMockLocationSuspected?: boolean;
+  recordedAt: string;
+}
+
+export interface IngestGpsPointsRequest {
+  points: GpsPointInput[];
+}
+
+export interface GpsPointResult {
+  recordedAt: string;
+  distanceFromPlannedMeters: number | null;
+  withinTolerance: boolean;
+  abnormalSpeed: boolean;
+  suspectedManipulation: boolean;
+}
+
+export interface IngestGpsPointsResponse {
+  routeTraceId: string | null;
+  toleranceMeters: number;
+  points: GpsPointResult[];
+}
+
+export interface SubmitDeviationRequestRequest {
+  deviationType: DeviationType;
+  reason: string;
+  remarks?: string;
+  distanceMeters?: number;
+}
+
+export interface DeviationRequestSummary {
+  id: string;
+  activityInstanceId: string;
+  locationName: string;
+  userFullName: string;
+  deviationType: DeviationType;
+  distanceMeters: string | null;
+  reason: string;
+  remarks: string | null;
+  status: ApprovalDecisionStatus;
+  escalationLevel: number;
+  decidedByName: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+export interface DecideDeviationRequestRequest {
+  decision: 'APPROVED' | 'REJECTED';
+  remarks?: string;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stage 3.1 — Campaign SKU Master + reports (report-format-library §§1-3)
 // ---------------------------------------------------------------------------------------------

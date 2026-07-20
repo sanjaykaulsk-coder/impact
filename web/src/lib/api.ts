@@ -17,6 +17,8 @@ import type {
   CreatePjpRequest,
   CreatePjpResponse,
   DecideApprovalRequest,
+  DecideDeviationRequestRequest,
+  DeviationRequestSummary,
   DfrReportResponse,
   FormTemplateDetail,
   FormTemplateSummary,
@@ -281,6 +283,17 @@ export const api = {
       request<SupervisorInboxItem>(`/campaigns/${campaignId}/supervisor/approvals/${approvalId}/decide`, {
         method: 'POST',
         body: JSON.stringify(dto),
+      }),
+    deviationInbox: (campaignId: string, status: ApprovalDecisionStatus = 'PENDING') =>
+      request<DeviationRequestSummary[]>(`/campaigns/${campaignId}/supervisor/deviation-requests?status=${status}`),
+    decideDeviation: (campaignId: string, deviationRequestId: string, dto: DecideDeviationRequestRequest) =>
+      request<DeviationRequestSummary>(`/campaigns/${campaignId}/supervisor/deviation-requests/${deviationRequestId}/decide`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
+    escalateDeviation: (campaignId: string, deviationRequestId: string) =>
+      request<DeviationRequestSummary>(`/campaigns/${campaignId}/supervisor/deviation-requests/${deviationRequestId}/escalate`, {
+        method: 'POST',
       }),
   },
   workflow: {

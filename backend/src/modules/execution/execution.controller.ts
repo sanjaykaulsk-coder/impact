@@ -18,8 +18,10 @@ import { CampaignScopeGuard } from '../../common/guards/campaign-scope.guard';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
+import { IngestGpsPointsDto } from './dto/ingest-gps-points.dto';
 import { InitMediaUploadDto } from './dto/init-media-upload.dto';
 import { MarkSopItemDto } from './dto/mark-sop-item.dto';
+import { SubmitDeviationRequestDto } from './dto/submit-deviation-request.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { ExecutionService } from './execution.service';
 
@@ -159,5 +161,29 @@ export class ExecutionController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.execution.resubmit(tenant, activityInstanceId, user.id);
+  }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/gps-points')
+  ingestGpsPoints(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @Body() dto: IngestGpsPointsDto,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.execution.ingestGpsPoints(tenant, activityInstanceId, user.id, dto);
+  }
+
+  @RequirePermissions('create')
+  @Post('activity-instances/:activityInstanceId/deviation-requests')
+  submitDeviationRequest(
+    @Param('campaignId') _campaignId: string,
+    @Param('activityInstanceId') activityInstanceId: string,
+    @Body() dto: SubmitDeviationRequestDto,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.execution.submitDeviationRequest(tenant, activityInstanceId, user.id, dto);
   }
 }

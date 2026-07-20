@@ -6,6 +6,7 @@ import { RequirePermissions } from '../../common/decorators/require-permissions.
 import { CampaignScopeGuard } from '../../common/guards/campaign-scope.guard';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
+import { DecideDeviationRequestDto } from './dto/decide-deviation-request.dto';
 import { SupervisorService } from './supervisor.service';
 
 const VALID_STATUSES: ApprovalStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
@@ -51,5 +52,39 @@ export class SupervisorController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.supervisor.decide(tenant, approvalId, user.id, dto);
+  }
+
+  @Get('deviation-requests')
+  deviationInbox(
+    @Param('campaignId') _campaignId: string,
+    @Query('status') status: string | undefined,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    const resolved = (status?.toUpperCase() as ApprovalStatus) || 'PENDING';
+    if (!VALID_STATUSES.includes(resolved)) {
+      throw new BadRequestException(`status must be one of ${VALID_STATUSES.join(', ')}`);
+    }
+    return this.supervisor.deviationInbox(tenant, resolved);
+  }
+
+  @Post('deviation-requests/:deviationRequestId/decide')
+  decideDeviation(
+    @Param('campaignId') _campaignId: string,
+    @Param('deviationRequestId') deviationRequestId: string,
+    @Body() dto: DecideDeviationRequestDto,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.supervisor.decideDeviation(tenant, deviationRequestId, user.id, dto);
+  }
+
+  @Post('deviation-requests/:deviationRequestId/escalate')
+  escalateDeviation(
+    @Param('campaignId') _campaignId: string,
+    @Param('deviationRequestId') deviationRequestId: string,
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.supervisor.escalateDeviation(tenant, deviationRequestId, user.id);
   }
 }

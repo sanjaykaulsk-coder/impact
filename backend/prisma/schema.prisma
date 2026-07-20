@@ -1318,31 +1318,37 @@ model CheckOut {
 // Accuracy-aware capture (doc 08 risk #5): accuracyMeters is stored with every point so deviation
 // rules can evaluate confidence, not just raw distance.
 model GPSPoint {
-  id                      String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId                String                                @db.Uuid
-  activityInstanceId      String?                               @db.Uuid
-  activityInstance        ActivityInstance?                     @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
-  userId                  String                                @db.Uuid
-  deviceId                String?                               @db.Uuid
-  device                  Device?                               @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  campaignId              String                                @db.Uuid
-  latitude                Decimal                               @db.Decimal(9, 6)
-  longitude               Decimal                               @db.Decimal(9, 6)
-  geoPoint                Unsupported("geography(Point,4326)")?
-  accuracyMeters          Decimal?                              @db.Decimal(8, 2)
-  speedKmh                Decimal?                              @db.Decimal(6, 2)
-  isMockLocationSuspected Boolean                               @default(false)
-  recordedAt              DateTime
-  createdAt               DateTime                              @default(now())
+  id                        String                                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                  String                                @db.Uuid
+  activityInstanceId        String?                               @db.Uuid
+  activityInstance          ActivityInstance?                     @relation(fields: [activityInstanceId], references: [id], onDelete: SetNull)
+  routeTraceId              String?                               @db.Uuid
+  routeTrace                RouteTrace?                           @relation(fields: [routeTraceId], references: [id], onDelete: SetNull)
+  userId                    String                                @db.Uuid
+  deviceId                  String?                               @db.Uuid
+  device                    Device?                               @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  campaignId                String                                @db.Uuid
+  latitude                  Decimal                               @db.Decimal(9, 6)
+  longitude                 Decimal                               @db.Decimal(9, 6)
+  geoPoint                  Unsupported("geography(Point,4326)")?
+  accuracyMeters            Decimal?                              @db.Decimal(8, 2)
+  speedKmh                  Decimal?                              @db.Decimal(6, 2)
+  distanceFromPlannedMeters Int?
+  isMockLocationSuspected   Boolean                               @default(false)
+  recordedAt                DateTime
+  createdAt                 DateTime                              @default(now())
 
   @@index([clientId])
   @@index([activityInstanceId])
+  @@index([routeTraceId])
   @@index([campaignId])
   @@map("gps_points")
 }
 
 model RouteTrace {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
+  campaignId         String           @db.Uuid
   activityInstanceId String           @db.Uuid
   activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
   userId             String           @db.Uuid
@@ -1351,6 +1357,10 @@ model RouteTrace {
   endedAt            DateTime?
   createdAt          DateTime         @default(now())
 
+  gpsPoints GPSPoint[]
+
+  @@index([clientId])
+  @@index([campaignId])
   @@index([activityInstanceId])
   @@map("route_traces")
 }
@@ -1606,6 +1616,9 @@ model DeviationRequest {
   status             ApprovalStatus   @default(PENDING)
   decidedByUserId    String?          @db.Uuid
   decidedAt          DateTime?
+  // Manual escalation only this stage (no delayed-job/queue infra exists yet to promote this on a
+  // timer per spec §29's 0/15/30/60-minute ladder) — see docs/ASSUMPTIONS.md A-059.
+  escalationLevel    Int              @default(0)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 

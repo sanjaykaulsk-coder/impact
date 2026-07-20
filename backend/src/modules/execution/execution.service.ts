@@ -1,26 +1,29 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { AuditService } from '../../core/audit/audit.service';
+import { postgisDistanceMeters } from '../../core/geo/postgis-distance';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CHUNK_SIZE_BYTES } from './execution.constants';
 import { GpsEventDto } from './dto/gps-event.dto';
+import { GpsPointDto, IngestGpsPointsDto } from './dto/ingest-gps-points.dto';
 import { InitMediaUploadDto } from './dto/init-media-upload.dto';
+import { SubmitDeviationRequestDto } from './dto/submit-deviation-request.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { skuBindingOf } from '../forms/archetypes';
 import { expectedClosingStock } from '../reports/formula';
 
-/** Great-circle distance in metres — used to check a field worker's GPS position against the
- * planned location, same tolerance concept as CampaignBranding's deviationToleranceMeters. */
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// Abnormal-speed threshold (spec §14's "abnormal speed" deviation type) — no highway travel is
+// realistically part of a field visit's activity radius, so anything faster than this between two
+// consecutive fixes is flagged, not silently recorded.
+const ABNORMAL_SPEED_KMH = 120;
+
+// Implied-speed threshold for "impossible GPS jump" detection between two consecutive fixes — well
+// beyond any real vehicle, distinguishing a suspected spoofed/mocked location from a genuinely fast
+// but plausible device-reported speed (ABNORMAL_SPEED_KMH above).
+const IMPOSSIBLE_JUMP_KMH = 300;
 
 const MILESTONE_INCLUDE = {
   formVersion: {
@@ -39,6 +42,7 @@ export class ExecutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly media: MediaStorageService,
+    private readonly audit: AuditService,
   ) {}
 
   private assertOwnership(activity: { assignedUserId: string | null }, userId: string) {
@@ -173,7 +177,7 @@ export class ExecutionService {
       const plannedLng = activity.pjpRow?.longitude ?? activity.location?.longitude;
       const distanceFromPlannedMeters =
         plannedLat != null && plannedLng != null
-          ? haversineMeters(dto.latitude, dto.longitude, Number(plannedLat), Number(plannedLng))
+          ? await postgisDistanceMeters(tx, dto.latitude, dto.longitude, Number(plannedLat), Number(plannedLng))
           : null;
 
       const checkIn = await tx.checkIn.create({
@@ -668,6 +672,141 @@ export class ExecutionService {
       return tx.approval.update({
         where: { id: approval.id },
         data: { status: 'PENDING', approverUserId: null, decidedAt: null },
+      });
+    });
+  }
+
+  /**
+   * Continuous location capture during an activity (spec §14's "monitor: current GPS... route
+   * travelled vs planned, stops and stop duration, speed... impossible GPS jumps, unusual
+   * movement"), distinct from the one-shot fixes CheckIn/CheckOut already record. Each point is
+   * checked against the planned location via the same real PostGIS distance calculation checkIn()
+   * uses (build-sequence S4.1: "PostGIS tolerance checks"), and consecutive points are checked for
+   * abnormal speed. Every point accumulates into one running RouteTrace per activity instance —
+   * this is intentionally the server-side half only; nothing in this codebase yet streams points
+   * continuously from the device (see docs/ASSUMPTIONS.md A-059).
+   */
+  async ingestGpsPoints(tenant: TenantContext, activityInstanceId: string, userId: string, dto: IngestGpsPointsDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({
+        where: { id: activityInstanceId },
+        include: { pjpRow: true, location: true },
+      });
+      this.assertOwnership(activity, userId);
+
+      const plannedLat = activity.pjpRow?.latitude ?? activity.location?.latitude;
+      const plannedLng = activity.pjpRow?.longitude ?? activity.location?.longitude;
+      const campaign = await tx.campaign.findUniqueOrThrow({ where: { id: tenant.campaignId } });
+
+      let trace = await tx.routeTrace.findFirst({ where: { activityInstanceId }, orderBy: { startedAt: 'desc' } });
+
+      const sorted = [...dto.points].sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt));
+      const results: {
+        recordedAt: string;
+        distanceFromPlannedMeters: number | null;
+        withinTolerance: boolean;
+        abnormalSpeed: boolean;
+        suspectedManipulation: boolean;
+      }[] = [];
+
+      let previous: GpsPointDto | null = null;
+      for (const point of sorted) {
+        const distanceFromPlannedMeters =
+          plannedLat != null && plannedLng != null
+            ? Math.round(await postgisDistanceMeters(tx, point.latitude, point.longitude, Number(plannedLat), Number(plannedLng)))
+            : null;
+
+        const abnormalSpeed = point.speedKmh != null && point.speedKmh > ABNORMAL_SPEED_KMH;
+
+        // "Impossible GPS jumps" (spec §14) — an implied speed between two consecutive fixes far
+        // beyond anything a real vehicle achieves is the same signal spec §18 calls suspected
+        // location manipulation, distinct from a genuinely fast but plausible device-reported speed.
+        let suspectedManipulation = false;
+        if (previous) {
+          const gapSeconds = (Date.parse(point.recordedAt) - Date.parse(previous.recordedAt)) / 1000;
+          if (gapSeconds > 0) {
+            const jumpMeters = await postgisDistanceMeters(tx, previous.latitude, previous.longitude, point.latitude, point.longitude);
+            const impliedSpeedKmh = (jumpMeters / gapSeconds) * 3.6;
+            suspectedManipulation = impliedSpeedKmh > IMPOSSIBLE_JUMP_KMH;
+          }
+        }
+
+        // Trace must exist before the point is written, so the very first point of a fresh trace
+        // is linked too — not just the second point onward.
+        if (!trace) {
+          trace = await tx.routeTrace.create({
+            data: {
+              clientId: tenant.clientId,
+              campaignId: tenant.campaignId,
+              activityInstanceId,
+              userId,
+              pointsCount: 0,
+              startedAt: new Date(point.recordedAt),
+              endedAt: new Date(point.recordedAt),
+            },
+          });
+        }
+
+        await tx.gPSPoint.create({
+          data: {
+            clientId: tenant.clientId,
+            campaignId: tenant.campaignId,
+            activityInstanceId,
+            routeTraceId: trace.id,
+            userId,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            accuracyMeters: point.accuracyMeters,
+            speedKmh: point.speedKmh,
+            distanceFromPlannedMeters,
+            isMockLocationSuspected: (point.isMockLocationSuspected ?? false) || suspectedManipulation,
+            recordedAt: new Date(point.recordedAt),
+          },
+        });
+
+        trace = await tx.routeTrace.update({
+          where: { id: trace.id },
+          data: { pointsCount: { increment: 1 }, endedAt: new Date(point.recordedAt) },
+        });
+
+        results.push({
+          recordedAt: point.recordedAt,
+          distanceFromPlannedMeters,
+          withinTolerance: distanceFromPlannedMeters === null || distanceFromPlannedMeters <= campaign.deviationToleranceMeters,
+          abnormalSpeed,
+          suspectedManipulation,
+        });
+        previous = point;
+      }
+
+      return { routeTraceId: trace?.id ?? null, toleranceMeters: campaign.deviationToleranceMeters, points: results };
+    });
+  }
+
+  /**
+   * Spec §14's deviation workflow: "detected → user warned → user selects reason + remarks →
+   * submits deviation request → Activity Supervisor alerted... activity continues while approval
+   * is pending." Nothing in check-in/check-out/GPS ingestion blocks on this — the request is
+   * purely a record for the supervisor to review, submitted by the field worker after the app has
+   * already warned them client-side (that warning UI is not built this session — see A-059).
+   */
+  async submitDeviationRequest(tenant: TenantContext, activityInstanceId: string, userId: string, dto: SubmitDeviationRequestDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const activity = await tx.activityInstance.findUniqueOrThrow({ where: { id: activityInstanceId } });
+      this.assertOwnership(activity, userId);
+
+      return tx.deviationRequest.create({
+        data: {
+          clientId: tenant.clientId,
+          campaignId: tenant.campaignId,
+          activityInstanceId,
+          userId,
+          deviationType: dto.deviationType,
+          distanceMeters: dto.distanceMeters,
+          reason: dto.reason,
+          remarks: dto.remarks,
+          status: 'PENDING',
+        },
       });
     });
   }

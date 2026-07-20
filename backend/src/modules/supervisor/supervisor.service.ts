@@ -1,9 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ApprovalStatus, Prisma } from '@prisma/client';
+import { AuditService } from '../../core/audit/audit.service';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
+import { DecideDeviationRequestDto } from './dto/decide-deviation-request.dto';
 
 const ACTIVITY_INCLUDE = {
   pjpRow: true,
@@ -28,6 +30,7 @@ export class SupervisorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly media: MediaStorageService,
+    private readonly audit: AuditService,
   ) {}
 
   async inbox(tenant: TenantContext, status: ApprovalStatus) {
@@ -75,6 +78,137 @@ export class SupervisorService {
 
       return updated;
     });
+  }
+
+  /**
+   * Spec §14's deviation workflow, supervisor side: "Activity Supervisor alerted → approve/reject
+   * → decision stored in audit history." The activity itself is never gated by this — approve or
+   * reject, the field worker's already-continuing activity is unaffected; this is purely the
+   * record of whether the explanation was accepted.
+   */
+  async deviationInbox(tenant: TenantContext, status: ApprovalStatus) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const requests = await tx.deviationRequest.findMany({
+        where: { campaignId: tenant.campaignId, status },
+        orderBy: { createdAt: 'asc' },
+      });
+      return this.enrichDeviations(tx, requests);
+    });
+  }
+
+  async decideDeviation(tenant: TenantContext, deviationRequestId: string, approverUserId: string, dto: DecideDeviationRequestDto) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const request = await this.findScopedDeviation(tx, tenant, deviationRequestId);
+      if (request.status !== 'PENDING') {
+        throw new BadRequestException('This deviation request has already been decided');
+      }
+
+      const updated = await tx.deviationRequest.update({
+        where: { id: deviationRequestId },
+        data: { status: dto.decision, remarks: dto.remarks ?? request.remarks, decidedByUserId: approverUserId, decidedAt: new Date() },
+      });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId: approverUserId,
+        action: dto.decision === 'APPROVED' ? 'DEVIATION_REQUEST_APPROVED' : 'DEVIATION_REQUEST_REJECTED',
+        entityType: 'DeviationRequest',
+        entityId: deviationRequestId,
+        before: request,
+        after: updated,
+      });
+
+      return updated;
+    });
+  }
+
+  /**
+   * Manual escalation only (spec §29's ladder is Activity Supervisor → Activity Spoke → Regional
+   * Operations → Operations Director on a 0/15/30/60-minute timer) — there's no delayed-job queue
+   * in this codebase yet to promote a stale deviation request automatically, so a supervisor bumps
+   * the level themselves when a request has sat too long. See docs/ASSUMPTIONS.md A-059.
+   */
+  async escalateDeviation(tenant: TenantContext, deviationRequestId: string, actorUserId: string) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const request = await this.findScopedDeviation(tx, tenant, deviationRequestId);
+      if (request.status !== 'PENDING') {
+        throw new BadRequestException('Only a pending deviation request can be escalated');
+      }
+
+      const updated = await tx.deviationRequest.update({
+        where: { id: deviationRequestId },
+        data: { escalationLevel: { increment: 1 } },
+      });
+
+      await this.audit.record(tx, {
+        clientId: tenant.clientId,
+        campaignId: tenant.campaignId,
+        actorUserId,
+        action: 'DEVIATION_REQUEST_ESCALATED',
+        entityType: 'DeviationRequest',
+        entityId: deviationRequestId,
+        before: { escalationLevel: request.escalationLevel },
+        after: { escalationLevel: updated.escalationLevel },
+      });
+
+      return updated;
+    });
+  }
+
+  private async findScopedDeviation(tx: Prisma.TransactionClient, tenant: TenantContext, deviationRequestId: string) {
+    const request = await tx.deviationRequest.findUnique({ where: { id: deviationRequestId } });
+    if (!request) throw new NotFoundException('Deviation request not found');
+    if (request.campaignId !== tenant.campaignId) {
+      throw new ForbiddenException('This deviation request belongs to a different campaign');
+    }
+    return request;
+  }
+
+  private async enrichDeviations(
+    tx: Prisma.TransactionClient,
+    requests: {
+      id: string;
+      activityInstanceId: string;
+      userId: string;
+      deviationType: string;
+      distanceMeters: Prisma.Decimal | null;
+      reason: string;
+      remarks: string | null;
+      status: ApprovalStatus;
+      escalationLevel: number;
+      decidedByUserId: string | null;
+      decidedAt: Date | null;
+      createdAt: Date;
+    }[],
+  ) {
+    const userIds = [...new Set(requests.flatMap((r) => [r.userId, r.decidedByUserId].filter((id): id is string => !!id)))];
+    const activityIds = [...new Set(requests.map((r) => r.activityInstanceId))];
+    const [users, activities] = await Promise.all([
+      tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } }),
+      tx.activityInstance.findMany({
+        where: { id: { in: activityIds } },
+        include: { pjpRow: { select: { locationName: true } } },
+      }),
+    ]);
+    const nameById = new Map(users.map((u) => [u.id, u.fullName]));
+    const activityById = new Map(activities.map((a) => [a.id, a]));
+
+    return requests.map((r) => ({
+      id: r.id,
+      activityInstanceId: r.activityInstanceId,
+      locationName: activityById.get(r.activityInstanceId)?.pjpRow?.locationName ?? 'Field location',
+      userFullName: nameById.get(r.userId) ?? 'Unknown',
+      deviationType: r.deviationType,
+      distanceMeters: r.distanceMeters,
+      reason: r.reason,
+      remarks: r.remarks,
+      status: r.status,
+      escalationLevel: r.escalationLevel,
+      decidedByName: r.decidedByUserId ? (nameById.get(r.decidedByUserId) ?? null) : null,
+      decidedAt: r.decidedAt,
+      createdAt: r.createdAt,
+    }));
   }
 
   private async findScopedApproval(tx: Prisma.TransactionClient, tenant: TenantContext, approvalId: string) {

@@ -1,8 +1,50 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 — APPROVED. Stage 3.4 — APPROVED. Stage 4.1 (GPS/route/deviation engine) — starting.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — built, all checks passing, awaiting founder review.**
 
-## Stage 3.4 — PJP management depth (this session, after founder approved Stage 3.3)
+## Stage 4.1 — GPS/route/deviation engine (this session, after founder approved Stage 3.4)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S4.1 and spec §14: PostGIS tolerance checks,
+deviation request → supervisor decision → escalation, route trace.
+
+**Scope note, decided this session (A-059):** this covers the backend engine and the supervisor's
+web review screen — the same kind of thread-split Stage 2 used (admin/field/supervisor as separate
+sessions). Continuous GPS tracking *on the phone itself*, and the on-device "you've gone off-plan,
+explain why" warning screen, are a distinct, larger piece of client engineering — not touched this
+session, explicitly queued as the next slice, not silently skipped.
+
+- **Real PostGIS distance checks, replacing the placeholder math that had stood in for them since
+  Session B.** Check-in's "how far from the planned spot" number, and every new GPS point's
+  distance check, now run a genuine database distance calculation instead of a hand-rolled formula
+  — exactly what the build-sequence line calls for.
+- **New: continuous location can now be recorded and checked** — a new endpoint accepts a batch of
+  GPS points for an ongoing activity, checks each one against the planned location and the
+  campaign's tolerance setting, flags anything moving unrealistically fast, and groups the points
+  into a running "route trace" for that visit.
+- **New: the deviation-request workflow is real, not just modeled.** A field worker can submit a
+  reason for going off-plan (wrong location, late arrival, etc.) — the activity is never blocked or
+  paused by this, exactly as designed. It lands in a new **Deviations** screen for supervisors,
+  who can approve, reject (with remarks), or escalate it. Every decision is permanently recorded
+  (reusing the same tamper-proof history mechanism built for Stage 3.4's PJP changes).
+- **A real, previously invisible gap found and fixed**: the "route trace" database table had never
+  had the security backstop the founder asked to have added to every other client-data table back
+  in the "fix it now" decision — because nothing had ever written to it before, so the gap was
+  invisible until this session was about to become its first real user. Fixed before any data
+  exists in it, at zero cost or risk.
+- **Automatic timed escalation (spec's 0/15/30/60-minute ladder) is not built this session** — that
+  needs a scheduling system this project doesn't have yet, and building just enough of one for this
+  single feature would be wasted, throwaway work ahead of a later stage that needs to build it
+  properly for several features at once. A supervisor can escalate a stuck request by hand today;
+  automatic promotion is queued for later.
+- **Verified**: backend and web build clean; full regression test suite still 13/13; every new
+  piece tested live against a real running backend — including proving an out-of-tolerance point,
+  an unrealistic speed, and an "impossible jump" between two GPS readings all get correctly flagged
+  (and a normal reading correctly doesn't); a route trace correctly links every point to it,
+  including a bug in that exact linking that was caught and fixed before this was called done, not
+  left for you to find; a submitted deviation correctly appears in the new Deviations screen,
+  gets escalated, decided, and the decision correctly can't be changed afterward.
+
+## Stage 3.4 — PJP management depth (previous session, after founder approved Stage 3.3)
 
 Per `docs/architecture/09-mvp-build-sequence.md` S3.4 and spec §13: edit / cancel / postpone /
 reschedule / reassign a planned visit, with full change history, plus sample upload templates.
@@ -494,7 +536,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 7. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
-10. **Stage 4.1 (GPS/route/deviation engine) is now starting** — this adds real-time location tracking against the planned route, automatic detection of things like wrong location or unusually long stops, and a request/approval flow when a field user needs to deviate from plan.
+10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — built, all checks passing, awaiting your review.** See "Reviewing Stage 4.1" below for a self-guided walkthrough using the no-phone script (extended with a new `--deviation` mode).
+11. **The Flutter phone app itself is not yet touched by Stage 4.1** — continuously tracking location while a visit is underway, and warning the field worker on the spot when they've gone off-plan, is real, separate phone-side work queued as the next slice, not forgotten. Everything reviewable today is the web admin side.
+12. **Approve Stage 4.1, or request changes, before the next stage starts** — per process rules, this is a phase boundary.
 
 ## How to see it yourself
 
@@ -637,6 +681,27 @@ Also web-only, no phone needed. No database change this time either.
 7. Try **Cancel** on a different stop — confirm it moves to CANCELLED status.
 8. On the upload screen, there's now a **"Download a sample CSV"** link — click it to see the
    ready-to-fill template you can hand to whoever prepares your route plans.
+
+### Reviewing Stage 4.1 — GPS/route/deviation engine
+
+This one needs the no-phone script, same as the reject/resubmit/approve test earlier — there's no
+phone side built yet to test through the app itself (see the note above). Two terminal commands,
+then everything else is in the browser.
+
+1. In a fresh Terminal tab: `cd ~/Desktop/impact-field-command && git pull origin claude/phase-c-foundation-sfqijm`
+2. Then: `node backend/scripts/simulate-field-visit.mjs --deviation`
+   — this logs in as Rahul Kumar, checks in if needed, sends a GPS reading far from the planned
+   spot, and submits a deviation request explaining why (a simulated "market relocated for the
+   day" reason).
+3. In the browser, log in as Rohan Mehta (`9000000001`) and open the new **Deviations** page in
+   the sidebar.
+4. You should see the new request — Danapur Cantt Market, "Outside permitted radius," with Rahul's
+   explanation. Click it.
+5. Try **Escalate** — the request should get a small "escalated ×1" badge in the list.
+6. Try **Approve** (or Reject, with a remark) — the request should move out of the Pending tab.
+   Check the Approved (or Rejected) tab to confirm it landed there.
+7. Optional: run the script again — it reuses the same Danapur visit, so you can generate another
+   test deviation any time you want to re-test the screen.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.

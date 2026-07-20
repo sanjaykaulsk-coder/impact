@@ -23,6 +23,7 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },
   { label: 'Assignments', requiredPermission: 'allocate', href: '/dashboard/assignments' },
   { label: 'Approvals', requiredPermission: 'approve', href: '/dashboard/approvals' },
+  { label: 'Deviations', requiredPermission: 'approve', href: '/dashboard/deviations' },
   { label: 'Reports', requiredPermission: 'view_reports', href: '/dashboard/reports' },
   { label: 'Readiness', requiredPermission: 'view_reports', href: '/dashboard/readiness' },
 ];
