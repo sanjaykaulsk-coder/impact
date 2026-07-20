@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, HOLDING pending founder's real-device test. No further build work proceeds until tested and approved.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — APPROVED, confirmed on a real Android phone.**
 
 ## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (this session, after founder approved Stage 4.1)
 
@@ -567,7 +567,8 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
 10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED**, 20 July 2026. You personally confirmed: running the `--deviation` test script, seeing the resulting request appear on the new Deviations page with the right location/field-user/type, escalating it, and approving it with a comment — confirmed it correctly moved to the Approved tab.
-11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, HOLDING for real-device testing.** You chose to arrange a phone and test properly before approving, rather than approve on code checks alone — the right call for phone-only work like this. No further build work proceeds past this stage until you've tested it and given the go-ahead; picking this back up is just a matter of you saying so once a phone is in hand.
+11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — APPROVED**, 20 July 2026. You tested on a real Android phone end to end: created a fresh test assignment for Rahul Kumar, checked in, confirmed a deviation reported from the phone appeared correctly on the web admin's Deviations page. This is the first Stage 4 piece confirmed on real hardware, not just code checks.
+12. **Note on stage numbering**: what this session called "Stage 4.2" was the phone-side half of Stage 4.1 (GPS/route/deviation), not the build plan's own numbered Stage 4.2. The next *build-sequence* stage is the real **S4.2: Device-risk controls** (signal collection, per-campaign risk rules, supervisor review queue) — nothing has been built for that yet. Flagging this now so the numbering in future updates matches `docs/architecture/09-mvp-build-sequence.md` exactly, not an ad-hoc session label.
 
 ## How to see it yourself
 
