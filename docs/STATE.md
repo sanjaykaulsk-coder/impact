@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 — APPROVED. Stage 3.4 (PJP management depth) — built, all checks passing, awaiting founder review.**
+**Last updated:** 19 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3.1 — APPROVED. Stage 3.2 — APPROVED. Full database security hardening — DONE, verified. Stage 3.3 — APPROVED. Stage 3.4 — APPROVED. Stage 4.1 (GPS/route/deviation engine) — starting.**
 
 ## Stage 3.4 — PJP management depth (this session, after founder approved Stage 3.3)
 
@@ -492,8 +492,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 5. **A no-phone testing tool exists now** (`backend/scripts/simulate-field-visit.mjs`, with a `--resubmit` mode) — plays a full field visit against your own backend without needing a phone in hand. Keep using it for future testing sessions.
 6. **Stage 3.3 (activity template library) — APPROVED**, 19 July 2026. You personally confirmed on your own machine: the Activity Templates tab listing all 16 templates, applying "Mela Stall" to the Bihar campaign, and the resulting workflow (stage "Execution" with milestones Stall handover, Branding completed, Opening photo, Midday activity, and more) appearing correctly in Workflow Builder.
 7. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
-8. **Stage 3.4 (PJP management depth) — built, all checks passing, awaiting your review.** See "Reviewing Stage 3.4" below for a self-guided walkthrough (no phone needed — entirely a web admin feature).
-9. **Approve Stage 3.4, or request changes, before Stage 3.5 starts** — per process rules, this is a phase boundary
+8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
+9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
+10. **Stage 4.1 (GPS/route/deviation engine) is now starting** — this adds real-time location tracking against the planned route, automatic detection of things like wrong location or unusually long stops, and a request/approval flow when a field user needs to deviate from plan.
 
 ## How to see it yourself
 
