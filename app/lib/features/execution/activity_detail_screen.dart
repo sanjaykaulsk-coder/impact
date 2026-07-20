@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,28 @@ import '../../core/offline/outbox_database.dart';
 import '../../core/providers.dart';
 import '../auth/auth_controller.dart';
 import 'execution_models.dart';
+
+// Stage 4.2 (spec §14): captures a fix on this interval while a visit is checked in, buffers a
+// few before sending as one batch to POST .../gps-points — matches the backend endpoint's own
+// batch shape rather than one network call per fix. Foreground-only: tracking runs while this
+// screen is alive and the activity is checked in, not while the app is backgrounded — see
+// docs/ASSUMPTIONS.md A-061 for why continuous background tracking is explicitly out of scope
+// this session.
+const _gpsCaptureInterval = Duration(seconds: 45);
+const _gpsBatchSize = 3;
+
+const Map<String, String> _deviationTypeLabels = {
+  'OUTSIDE_PERMITTED_RADIUS': 'Outside permitted radius',
+  'UNPLANNED_LOCATION': 'Unplanned location',
+  'SKIPPED_LOCATION': 'Skipped location',
+  'WRONG_SEQUENCE': 'Wrong sequence',
+  'LATE_ARRIVAL': 'Late arrival',
+  'EARLY_DEPARTURE': 'Early departure',
+  'UNPLANNED_STOPPAGE': 'Unplanned stoppage',
+  'GPS_DISABLED': 'GPS disabled/unavailable',
+  'ABNORMAL_SPEED': 'Abnormal speed',
+  'SUSPECTED_LOCATION_MANIPULATION': 'Suspected location manipulation',
+};
 
 class ActivityDetailScreen extends ConsumerStatefulWidget {
   final String assignmentId;
@@ -23,13 +47,97 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   bool _loading = true;
   bool _actionInProgress = false;
 
+  Timer? _gpsTimer;
+  final List<Map<String, dynamic>> _gpsBuffer = [];
+  GpsPointResult? _flaggedPoint;
+  String? _gpsCaptureError;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  @override
+  void dispose() {
+    _gpsTimer?.cancel();
+    super.dispose();
+  }
+
   String get _campaignId => ref.read(authControllerProvider).selectedCampaignId!;
+
+  void _startGpsTrackingIfNeeded(bool hasCheckIn, bool hasCheckOut) {
+    if (_gpsTimer != null || !hasCheckIn || hasCheckOut) return;
+    _gpsTimer = Timer.periodic(_gpsCaptureInterval, (_) => _captureGpsTick());
+  }
+
+  void _stopGpsTracking() {
+    _gpsTimer?.cancel();
+    _gpsTimer = null;
+    _gpsBuffer.clear();
+  }
+
+  Future<void> _captureGpsTick() async {
+    if (_bundle == null) return;
+    try {
+      final position = await getCurrentPositionOrThrow();
+      _gpsBuffer.add({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'accuracyMeters': position.accuracy,
+        'speedKmh': position.speed * 3.6,
+        'recordedAt': DateTime.now().toIso8601String(),
+      });
+      if (mounted && _gpsCaptureError != null) setState(() => _gpsCaptureError = null);
+    } catch (e) {
+      // Silent — a missed background fix shouldn't interrupt whatever the field worker is
+      // actually doing (filling a form, taking a photo). Surfaced subtly in the UI, not a SnackBar.
+      if (mounted) setState(() => _gpsCaptureError = e.toString());
+      return;
+    }
+    if (_gpsBuffer.length >= _gpsBatchSize) await _flushGpsBuffer();
+  }
+
+  Future<void> _flushGpsBuffer() async {
+    if (_bundle == null || _gpsBuffer.isEmpty) return;
+    final batch = List<Map<String, dynamic>>.from(_gpsBuffer);
+    _gpsBuffer.clear();
+    try {
+      final result = await ref.read(executionRepositoryProvider).ingestGpsPoints(_campaignId, _bundle!.activity.id, batch);
+      final flagged = result.points.where((p) => p.isFlagged).toList();
+      if (flagged.isNotEmpty && mounted) setState(() => _flaggedPoint = flagged.last);
+    } catch (_) {
+      // Best-effort background enhancement (see class-level comment) — a failed batch (e.g. no
+      // connectivity) is simply not retried; the next capture tick tries again on its own.
+    }
+  }
+
+  void _openDeviationDialog({String? prefilledType, double? distanceMeters}) {
+    if (_bundle == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => _DeviationDialog(
+        initialType: prefilledType,
+        distanceMeters: distanceMeters,
+        onSubmit: (type, reason, remarks) async {
+          await ref.read(executionRepositoryProvider).submitDeviationRequest(
+                _campaignId,
+                _bundle!.activity.id,
+                deviationType: type,
+                reason: reason,
+                remarks: remarks,
+                distanceMeters: distanceMeters,
+              );
+          if (mounted) {
+            setState(() => _flaggedPoint = null);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sent to your supervisor for review.')),
+            );
+          }
+        },
+      ),
+    );
+  }
 
   Future<void> _load() async {
     // Only the very first load (no bundle yet) blocks the screen on failure — this screen is
@@ -47,6 +155,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     try {
       final bundle = await ref.read(executionRepositoryProvider).getOrCreateActivity(_campaignId, widget.assignmentId);
       if (mounted) setState(() => _bundle = bundle);
+      _startGpsTrackingIfNeeded(bundle.hasCheckIn, bundle.hasCheckOut);
+      if (bundle.hasCheckOut) _stopGpsTracking();
     } catch (e) {
       if (!mounted) return;
       if (isInitialLoad) {
@@ -86,6 +196,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         },
       );
       await _syncNow();
+      _startGpsTrackingIfNeeded(true, false);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Check-in failed: $e')));
     } finally {
@@ -107,6 +218,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           'deviceTimestamp': DateTime.now().toIso8601String(),
         },
       );
+      _stopGpsTracking();
       await _syncNow();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Check-out failed: $e')));
@@ -147,6 +259,25 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     } finally {
       if (mounted) setState(() => _actionInProgress = false);
     }
+  }
+
+  String? _flaggedTypeFor(GpsPointResult point) {
+    if (!point.withinTolerance) return 'OUTSIDE_PERMITTED_RADIUS';
+    if (point.suspectedManipulation) return 'SUSPECTED_LOCATION_MANIPULATION';
+    if (point.abnormalSpeed) return 'ABNORMAL_SPEED';
+    return null;
+  }
+
+  String _flaggedPointMessage(GpsPointResult point) {
+    if (!point.withinTolerance) {
+      final d = point.distanceFromPlannedMeters;
+      return d != null
+          ? 'You appear to be about ${d.round()}m from the planned location — explain why?'
+          : 'You appear to be away from the planned location — explain why?';
+    }
+    if (point.suspectedManipulation) return 'An unusual location jump was detected — explain why?';
+    if (point.abnormalSpeed) return 'An unusually high speed was detected — explain why?';
+    return 'Something about this visit looked unusual — explain why?';
   }
 
   @override
@@ -238,6 +369,38 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade200)),
                   child: Text('Approved by your supervisor.', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
+                ),
+
+              // Spec §14: "detected -> user warned -> user selects reason + remarks -> submits
+              // deviation request" — the activity is never blocked by this, only flagged.
+              if (hasCheckIn && !hasCheckOut && _flaggedPoint != null)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.shade300)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_flaggedPointMessage(_flaggedPoint!), style: TextStyle(color: Colors.amber.shade900)),
+                            const SizedBox(height: 8),
+                            OutlinedButton(
+                              onPressed: () => _openDeviationDialog(
+                                prefilledType: _flaggedTypeFor(_flaggedPoint!),
+                                distanceMeters: _flaggedPoint!.distanceFromPlannedMeters,
+                              ),
+                              child: const Text('Explain'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
               if (bundle.sopItems.isNotEmpty && !hasCheckIn) ...[
@@ -335,6 +498,26 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   padding: EdgeInsets.only(top: 8),
                   child: Text('Activity completed.', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
+
+              if (hasCheckIn && !hasCheckOut) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
+                    const SizedBox(width: 4),
+                    Text(
+                      _gpsCaptureError == null ? 'Location tracking on' : 'Location tracking paused',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _openDeviationDialog(),
+                  icon: const Icon(Icons.report_problem_outlined),
+                  label: const Text('Report a deviation from plan'),
+                ),
+              ],
 
               if (outbox.isNotEmpty) ...[
                 const SizedBox(height: 24),
@@ -508,4 +691,106 @@ class _OutboxStatusTileState extends State<_OutboxStatusTile> {
         'milestoneResponse' => 'Form submission',
         _ => type,
       };
+}
+
+/// Spec §14's deviation-request form — a reason is always required (matching the backend's own
+/// validation), remarks optional. `onSubmit` throwing propagates back into this dialog's own error
+/// display rather than being swallowed, since a field worker submitting an explanation is a
+/// deliberate action, not a background enhancement.
+class _DeviationDialog extends StatefulWidget {
+  final String? initialType;
+  final double? distanceMeters;
+  final Future<void> Function(String type, String reason, String? remarks) onSubmit;
+
+  const _DeviationDialog({this.initialType, this.distanceMeters, required this.onSubmit});
+
+  @override
+  State<_DeviationDialog> createState() => _DeviationDialogState();
+}
+
+class _DeviationDialogState extends State<_DeviationDialog> {
+  late String _type;
+  final _reasonController = TextEditingController();
+  final _remarksController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.initialType ?? _deviationTypeLabels.keys.first;
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_reasonController.text.trim().isEmpty) {
+      setState(() => _error = 'Please explain what happened.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.onSubmit(_type, _reasonController.text.trim(), _remarksController.text.trim().isEmpty ? null : _remarksController.text.trim());
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) setState(() => _error = e is ApiException ? e.message : e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Report a deviation'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('This visit keeps going — this just records why, for your supervisor to review.'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _type,
+              decoration: const InputDecoration(labelText: 'What happened?'),
+              items: _deviationTypeLabels.entries
+                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              onChanged: _submitting ? null : (v) => setState(() => _type = v!),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              enabled: !_submitting,
+              decoration: const InputDecoration(labelText: 'Reason *'),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _remarksController,
+              enabled: !_submitting,
+              decoration: const InputDecoration(labelText: 'Remarks (optional)'),
+              maxLines: 2,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: _submitting ? null : () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        ElevatedButton(onPressed: _submitting ? null : _submit, child: Text(_submitting ? 'Sending…' : 'Submit')),
+      ],
+    );
+  }
 }

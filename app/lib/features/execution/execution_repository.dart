@@ -135,4 +135,39 @@ class ExecutionRepository {
       {'status': status},
     );
   }
+
+  /// Batch of GPS fixes captured while a visit is underway (Stage 4.1's backend, spec §14). Called
+  /// directly, not via the offline outbox — this is a best-effort background enhancement, not a
+  /// user-initiated action the outbox's retry guarantees are meant for; see ASSUMPTIONS.md A-061.
+  Future<GpsIngestResult> ingestGpsPoints(
+    String campaignId,
+    String activityInstanceId,
+    List<Map<String, dynamic>> points,
+  ) async {
+    final json = await api.post(
+      '/campaigns/$campaignId/activity-instances/$activityInstanceId/gps-points',
+      {'points': points},
+    );
+    return GpsIngestResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Field worker's explanation for an off-plan reading (spec §14) — never blocks or pauses the
+  /// activity, submitted whether prompted by an on-device warning or reported by the worker
+  /// themselves.
+  Future<DeviationRequestRecord> submitDeviationRequest(
+    String campaignId,
+    String activityInstanceId, {
+    required String deviationType,
+    required String reason,
+    String? remarks,
+    double? distanceMeters,
+  }) async {
+    final json = await api.post('/campaigns/$campaignId/activity-instances/$activityInstanceId/deviation-requests', {
+      'deviationType': deviationType,
+      'reason': reason,
+      'remarks': ?remarks,
+      'distanceMeters': ?distanceMeters,
+    });
+    return DeviationRequestRecord.fromJson(json as Map<String, dynamic>);
+  }
 }

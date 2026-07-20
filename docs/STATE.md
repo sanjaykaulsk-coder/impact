@@ -1,8 +1,38 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — starting.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, awaiting founder review (real-device testing needed — see below).**
 
-## Stage 4.1 — GPS/route/deviation engine (this session, after founder approved Stage 3.4)
+## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (this session, after founder approved Stage 4.1)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S4.1 and spec §14 — the phone-side half of the
+engine built last session.
+
+- **The field app now tracks location continuously while a visit is checked in**, not just at
+  check-in/check-out — a location reading every 45 seconds while the activity screen is open,
+  sent to the server in small batches. If a reading looks off (wrong location, unusual speed, an
+  impossible jump between two readings), a warning banner appears right on the phone with an
+  "Explain" button.
+- **New "Report a deviation" button**, always available during an active visit — lets the field
+  worker explain something the system wouldn't catch on its own (skipped a stop, had to leave
+  early, GPS wasn't working), not just react to an automatic warning. Goes straight to the same
+  Deviations review screen built last session.
+- **Important, deliberate limitation — please read before testing**: tracking only runs while the
+  visit screen is open on the phone. If the field worker locks their phone or switches to another
+  app, tracking pauses until they come back. Building true "keeps tracking even with the phone in
+  their pocket" tracking is real, separate phone-engineering work (it needs Google Play–level
+  permissions and a persistent notification, the same kind of extra approval Play Store requires
+  for banking/delivery apps) — deliberately not attempted this session, since there's currently no
+  phone available to test it on and building something unverifiable felt like the wrong call. Logged
+  as a clear next step, not a shortcut.
+- **This is genuinely the first time this stage can't be verified on my end at all** — every
+  automatic check I have access to (`flutter analyze`, the code-quality check) passed clean, but
+  the two checks that actually run the app (`flutter test`, `flutter build linux`) are blocked by an
+  unrelated download problem specific to this sandbox, not something in the code itself. **This
+  stage needs your phone (or an Android emulator on your Mac) to properly confirm it works** — the
+  no-phone script can't simulate walking around with GPS on. If a phone becomes available again,
+  this is the natural next thing to test for real.
+
+## Stage 4.1 — GPS/route/deviation engine (previous session, after founder approved Stage 3.4)
 
 Per `docs/architecture/09-mvp-build-sequence.md` S4.1 and spec §14: PostGIS tolerance checks,
 deviation request → supervisor decision → escalation, route trace.
@@ -537,7 +567,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
 10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED**, 20 July 2026. You personally confirmed: running the `--deviation` test script, seeing the resulting request appear on the new Deviations page with the right location/field-user/type, escalating it, and approving it with a comment — confirmed it correctly moved to the Approved tab.
-11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) is now starting** — this is the phone-side half of Stage 4.1: tracking location continuously during a visit (not just at check-in/check-out), and warning the field worker on the spot if they've gone off-plan, with a way to explain why right there in the app.
+11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — built, but genuinely cannot be confirmed working without a phone.** Every automatic check available caught nothing wrong, but that's a lower bar than for previous stages — this is phone-only code with no web/no-phone-script equivalent to stand in for it. **Decision for you**: approve based on the code checks passing and confirm for real whenever a phone becomes available, or hold this stage open until you have a phone/emulator to test it properly first. Either is fine — just tell me which.
 
 ## How to see it yourself
 

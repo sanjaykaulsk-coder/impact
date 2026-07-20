@@ -339,3 +339,62 @@ class CheckInResult {
     );
   }
 }
+
+// Per-point result from POST .../gps-points (Stage 4.1's backend) — mirrors
+// backend/src/modules/execution/execution.service.ts's ingestGpsPoints() response shape.
+class GpsPointResult {
+  final DateTime recordedAt;
+  final double? distanceFromPlannedMeters;
+  final bool withinTolerance;
+  final bool abnormalSpeed;
+  final bool suspectedManipulation;
+
+  GpsPointResult({
+    required this.recordedAt,
+    this.distanceFromPlannedMeters,
+    required this.withinTolerance,
+    required this.abnormalSpeed,
+    required this.suspectedManipulation,
+  });
+
+  bool get isFlagged => !withinTolerance || abnormalSpeed || suspectedManipulation;
+
+  factory GpsPointResult.fromJson(Map<String, dynamic> json) => GpsPointResult(
+        recordedAt: DateTime.parse(json['recordedAt'] as String),
+        distanceFromPlannedMeters:
+            json['distanceFromPlannedMeters'] != null ? double.parse(json['distanceFromPlannedMeters'].toString()) : null,
+        withinTolerance: json['withinTolerance'] as bool,
+        abnormalSpeed: json['abnormalSpeed'] as bool,
+        suspectedManipulation: json['suspectedManipulation'] as bool,
+      );
+}
+
+class GpsIngestResult {
+  final String? routeTraceId;
+  final int toleranceMeters;
+  final List<GpsPointResult> points;
+
+  GpsIngestResult({this.routeTraceId, required this.toleranceMeters, required this.points});
+
+  factory GpsIngestResult.fromJson(Map<String, dynamic> json) => GpsIngestResult(
+        routeTraceId: json['routeTraceId'] as String?,
+        toleranceMeters: json['toleranceMeters'] as int,
+        points: (json['points'] as List<dynamic>? ?? []).map((p) => GpsPointResult.fromJson(p as Map<String, dynamic>)).toList(),
+      );
+}
+
+// Confirmation of a submitted deviation request (spec §14) — just enough to show the field worker
+// it went through; the full record (status/decision) is reviewed by a supervisor on the web admin.
+class DeviationRequestRecord {
+  final String id;
+  final String deviationType;
+  final String status;
+
+  DeviationRequestRecord({required this.id, required this.deviationType, required this.status});
+
+  factory DeviationRequestRecord.fromJson(Map<String, dynamic> json) => DeviationRequestRecord(
+        id: json['id'] as String,
+        deviationType: json['deviationType'] as String,
+        status: json['status'] as String,
+      );
+}
