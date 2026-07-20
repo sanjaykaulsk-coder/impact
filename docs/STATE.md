@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — built, all checks passing, awaiting founder review.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — starting.**
 
 ## Stage 4.1 — GPS/route/deviation engine (this session, after founder approved Stage 3.4)
 
@@ -536,9 +536,8 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 7. All work is committed and pushed to branch `claude/phase-c-foundation-sfqijm` on GitHub
 8. **Stage 3.4 (PJP management depth) — APPROVED**, 19 July 2026 ("resume the build" → confirmed via clarifying question as approval to move to Stage 4).
 9. **Architecture addendum (multi-angle analysis + unlimited templates) — answered, logged as A-058.** One open decision remains for later: whether the client self-service KPI-picker dashboard gets pulled into the main build now or stays a post-MVP add-on. Not blocking — flagged, not urgent.
-10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — built, all checks passing, awaiting your review.** See "Reviewing Stage 4.1" below for a self-guided walkthrough using the no-phone script (extended with a new `--deviation` mode).
-11. **The Flutter phone app itself is not yet touched by Stage 4.1** — continuously tracking location while a visit is underway, and warning the field worker on the spot when they've gone off-plan, is real, separate phone-side work queued as the next slice, not forgotten. Everything reviewable today is the web admin side.
-12. **Approve Stage 4.1, or request changes, before the next stage starts** — per process rules, this is a phase boundary.
+10. **Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED**, 20 July 2026. You personally confirmed: running the `--deviation` test script, seeing the resulting request appear on the new Deviations page with the right location/field-user/type, escalating it, and approving it with a comment — confirmed it correctly moved to the Approved tab.
+11. **Stage 4.2 (Flutter continuous GPS + on-device deviation warning) is now starting** — this is the phone-side half of Stage 4.1: tracking location continuously during a visit (not just at check-in/check-out), and warning the field worker on the spot if they've gone off-plan, with a way to explain why right there in the app.
 
 ## How to see it yourself
 
