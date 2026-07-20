@@ -123,7 +123,24 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
   return res.json();
 }
 
-async function tryRefresh(): Promise<boolean> {
+// Refresh tokens rotate server-side (each use invalidates the old one — token.service.ts's
+// `rotate()`), so two requests hitting 401 around the same moment (e.g. a page's own background
+// reload plus a user's click) must never each call tryRefresh() independently: whichever loses the
+// race presents an already-invalidated refresh token, fails, and clears tokenStore — wiping out
+// the *winner's* just-issued valid pair and silently logging the user out mid-session. This shared
+// in-flight promise makes every concurrent 401 await the same single refresh attempt instead.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function tryRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function doRefresh(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
