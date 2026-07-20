@@ -115,12 +115,23 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
     if (refreshed) return request<T>(path, init, false);
   }
 
+  // Read as text first: several endpoints (e.g. device-risk clear/block) return 201 with no body
+  // at all, not just 204 — calling res.json() directly on an empty body throws "Unexpected end of
+  // JSON input", which the caller sees as a generic failure even though the request succeeded.
+  const text = await res.text();
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
+    let body: { message?: string } = { message: res.statusText };
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        // leave the statusText fallback
+      }
+    }
     throw new ApiError(res.status, body.message ?? 'Request failed');
   }
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  if (!text) return undefined as T;
+  return JSON.parse(text);
 }
 
 // Refresh tokens rotate server-side (each use invalidates the old one — token.service.ts's
