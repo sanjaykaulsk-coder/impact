@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine, backend + admin half) — APPROVED. Stage 4.2 (Flutter continuous GPS + on-device deviation warning) — APPROVED, confirmed on a real Android phone.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, backend/admin half and phone half both confirmed. S4.2 (Device-risk controls, per the real build sequence) — starting.**
 
 ## Stage 4.2 — Flutter continuous GPS + on-device deviation warning (this session, after founder approved Stage 4.1)
 
