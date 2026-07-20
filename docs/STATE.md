@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, both halves confirmed. S4.2 (Device-risk controls) — built, all checks passing, awaiting founder review.**
+**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4.1 (GPS/route/deviation engine) — APPROVED, both halves confirmed. S4.2 (Device-risk controls) — built, all checks passing; a real login-refresh bug the founder hit while testing it (Clear button failing with "Unauthorized") has been root-caused and fixed — awaiting founder confirmation it's resolved on their machine.**
 
 ## S4.2 — Device-risk controls (this session, after founder said "please go ahead")
 
@@ -572,6 +572,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 6. **Real bugs found only by testing on a real phone** (A-033 through A-037): an outdated plugin incompatible with a newer Flutter SDK, a database transaction held open across slow photo-upload I/O, a camera screen that never actually requested location permission, an EXIF-rotation bug in the watermark compositor, and network requests with no timeout at all. See the "Real-device testing round" section above for the full account — this is exactly the class of bug that only shows up off a desktop simulator.
 7. **Sync-queue ordering bug, founder-diagnosed** (A-038): check-out could be attempted, and correctly rejected, before its own photo had synced — an unordered query plus no dependency enforcement between related outbox items. Fixed with deterministic ordering and an explicit wait-for-dependencies check, proved with two tests against a real (non-mocked) Drift database.
 8. **Design-doc deviation, founder-diagnosed** (A-039): Session B shipped a single-shot photo upload despite `docs/architecture/05` specifying chunked, resumable uploads — the schema even already had the `SyncStatus` states for it (`UPLOADING`, `PARTIALLY_UPLOADED`), just unused. Rebuilt to match the approved design: init/chunk/complete endpoints, disk-staged chunks, content-hash-based idempotent resumption, exponential backoff with jitter.
+9. **Web login-refresh race condition, founder-diagnosed** (A-064): clicking Clear on the Device Risk page intermittently failed with a genuine "Unauthorized" error, even right after a confirmed-fresh login. Root cause: refresh tokens are single-use and rotate on every login-refresh, but the web app could fire two refresh attempts at once (e.g. a page's own background check plus a button click) — whichever one lost the race presented an already-used token, failed, and wiped out the other one's brand-new valid session, silently signing the founder out mid-click. Fixed so concurrent refresh attempts now share one single attempt instead of racing. Found entirely from the founder's own screenshots (DevTools Network tab showing the real 401), not from a log or a test.
 
 ## Known limitations, logged and not silently hidden
 - **A-017**: the schema's role-assignment table is always campaign-scoped; there's no clean way yet to express a true platform-wide role. Worked around in seed data; flagged for a real fix in a later module.
@@ -600,6 +601,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 12. **Note on stage numbering**: what an earlier update called "Stage 4.2" was actually the phone-side half of Stage 4.1 (GPS/route/deviation). This entry (13) is the real, build-plan S4.2.
 13. **S4.2 (Device-risk controls) — built, all checks passing, awaiting your review.** See "Reviewing S4.2" below — no phone needed, the no-phone script has a new `--device-risk` mode. Please read the "deliberately narrow scope" note above before testing — this catches 2 of the 18 signals the full spec describes (clock mismatch, manipulated location), not rooted phones or tampered apps yet.
 14. **Approve S4.2, or request changes, before the next stage starts** — per process rules, this is a phase boundary.
+15. **Bug you found while testing S4.2, now fixed (A-064): "Could not clear this device" on the Device Risk page.** Nothing to do with Device Risk itself — a timing bug in how the whole app keeps you logged in could occasionally, silently sign you out mid-click on any page. Fixed and pushed. Please `git pull`, restart the backend and web admin, and try Clear again — if it still fails, screenshot it exactly as before and it'll get looked at again.
 
 ## How to see it yourself
 
