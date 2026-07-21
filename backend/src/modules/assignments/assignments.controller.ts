@@ -49,7 +49,8 @@ export class AssignmentsController {
     @Param('assignmentId') assignmentId: string,
     @Body() dto: UpdateAssignmentDto,
     @CurrentTenant() tenant: TenantContext,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.assignments.update(tenant, assignmentId, dto);
+    return this.assignments.update(tenant, assignmentId, dto, user.id);
   }
 }

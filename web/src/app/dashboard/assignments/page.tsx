@@ -23,6 +23,7 @@ export default function AssignmentsPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState<AssignmentStatus>('ASSIGNED');
+  const [editUserId, setEditUserId] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
   const canManage = access?.permissions.includes('allocate') ?? false;
@@ -84,6 +85,7 @@ export default function AssignmentsPage() {
   const startEdit = (a: AssignmentSummary) => {
     setEditingId(a.id);
     setEditStatus(a.status);
+    setEditUserId(a.userId);
   };
 
   const submitEdit = async (e: React.FormEvent) => {
@@ -92,7 +94,11 @@ export default function AssignmentsPage() {
     setEditSaving(true);
     setError(null);
     try {
-      await api.assignments.update(selectedCampaignId, editingId, { status: editStatus });
+      const editing = assignments?.find((a) => a.id === editingId);
+      await api.assignments.update(selectedCampaignId, editingId, {
+        status: editStatus,
+        ...(editing && editUserId !== editing.userId ? { userId: editUserId } : {}),
+      });
       setEditingId(null);
       loadAll();
     } catch (err) {
@@ -180,7 +186,7 @@ export default function AssignmentsPage() {
 
       {editingId && (
         <form className="panel" onSubmit={submitEdit}>
-          <h2>Update assignment status</h2>
+          <h2>Update assignment</h2>
           <div className="field">
             <label>Status</label>
             <select
@@ -194,6 +200,26 @@ export default function AssignmentsPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="field">
+            <label>Reassign to</label>
+            <select
+              value={editUserId}
+              onChange={(e) => setEditUserId(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8 }}
+            >
+              {users.map((u) => (
+                <option key={u.userId} value={u.userId}>
+                  {u.fullName} — {u.roleName}
+                </option>
+              ))}
+              {!users.some((u) => u.userId === editUserId) && (
+                <option value={editUserId}>{assignments?.find((a) => a.id === editingId)?.userFullName ?? '(current)'}</option>
+              )}
+            </select>
+            <p className="subtitle" style={{ marginTop: 4 }}>
+              Only possible while this stop hasn’t been checked in or completed yet.
+            </p>
           </div>
           <div className="panel-actions">
             <button className="btn-primary inline" type="submit" disabled={editSaving}>

@@ -18,6 +18,7 @@ import { PjpModule } from './modules/pjp/pjp.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SkusModule } from './modules/skus/skus.module';
 import { SupervisorModule } from './modules/supervisor/supervisor.module';
+import { TeamDashboardModule } from './modules/team-dashboard/team-dashboard.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 
 @Module({
@@ -39,6 +40,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     ReportsModule,
     SkusModule,
     SupervisorModule,
+    TeamDashboardModule,
     WorkflowsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

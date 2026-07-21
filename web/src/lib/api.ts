@@ -18,6 +18,7 @@ import type {
   CreatePjpResponse,
   DecideApprovalRequest,
   DecideDeviationRequestRequest,
+  DelayedActivityRow,
   DeviationRequestSummary,
   DeviceRiskAlert,
   DfrReportResponse,
@@ -39,7 +40,10 @@ import type {
   RoleSummary,
   StockReconciliationRow,
   SupervisorInboxItem,
+  TeamAttendanceRow,
+  TeamPerformanceRow,
   TokenPair,
+  UnsyncedUserRow,
   UpdateAssignmentRequest,
   UpdateCampaignRequest,
   UpdateClientRequest,
@@ -329,6 +333,20 @@ export const api = {
       request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/clear`, { method: 'POST' }),
     blockDevice: (campaignId: string, deviceId: string) =>
       request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/block`, { method: 'POST' }),
+  },
+  teamDashboard: {
+    attendance: (campaignId: string, date?: string) =>
+      request<TeamAttendanceRow[]>(`/campaigns/${campaignId}/team-dashboard/attendance${date ? `?date=${date}` : ''}`),
+    unsyncedUsers: (campaignId: string, thresholdHours?: number) =>
+      request<UnsyncedUserRow[]>(
+        `/campaigns/${campaignId}/team-dashboard/unsynced-users${thresholdHours ? `?thresholdHours=${thresholdHours}` : ''}`,
+      ),
+    delayedActivities: (campaignId: string, date?: string) =>
+      request<DelayedActivityRow[]>(`/campaigns/${campaignId}/team-dashboard/delayed-activities${date ? `?date=${date}` : ''}`),
+    performance: (campaignId: string, from?: string, to?: string) =>
+      request<TeamPerformanceRow[]>(
+        `/campaigns/${campaignId}/team-dashboard/performance${from ? `?from=${from}${to ? `&to=${to}` : ''}` : ''}`,
+      ),
   },
   workflow: {
     get: (campaignId: string) => request<WorkflowResponse | null>(`/campaigns/${campaignId}/workflow`),

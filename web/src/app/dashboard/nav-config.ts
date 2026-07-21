@@ -24,6 +24,7 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Assignments', requiredPermission: 'allocate', href: '/dashboard/assignments' },
   { label: 'Approvals', requiredPermission: 'approve', href: '/dashboard/approvals' },
   { label: 'Deviations', requiredPermission: 'approve', href: '/dashboard/deviations' },
+  { label: 'Team Dashboard', requiredPermission: 'approve', href: '/dashboard/team' },
   { label: 'Device Risk', requiredPermission: 'block', href: '/dashboard/device-risk' },
   { label: 'Reports', requiredPermission: 'view_reports', href: '/dashboard/reports' },
   { label: 'Readiness', requiredPermission: 'view_reports', href: '/dashboard/readiness' },

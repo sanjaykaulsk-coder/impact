@@ -856,3 +856,42 @@ export interface MarkAttendanceRequest {
   latitude?: number;
   longitude?: number;
 }
+
+// ---------------------------------------------------------------------------------------------
+// S5.1 — Team dashboard (spec §25, build sequence line: attendance, unsynced users, delayed
+// activities, team performance, reassignment)
+// ---------------------------------------------------------------------------------------------
+
+export interface TeamAttendanceRow {
+  userId: string;
+  fullName: string;
+  roleName: string;
+  dayStart: string | null;
+  dayEnd: string | null;
+}
+
+export interface UnsyncedUserRow {
+  userId: string;
+  fullName: string;
+  lastSeenAt: string | null;
+}
+
+export interface DelayedActivityRow {
+  pjpRowId: string;
+  locationName: string;
+  userId: string;
+  userFullName: string;
+  plannedStartTime: string | null;
+  plannedEndTime: string | null;
+  reason: string;
+}
+
+export interface TeamPerformanceRow {
+  userId: string;
+  fullName: string;
+  assigned: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  completionRate: number;
+}

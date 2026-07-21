@@ -1,9 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
+
+// Same "already has field activity in progress or completed" guard PjpService uses for its own
+// edit/cancel/postpone/reassign actions — reassigning a field worker's own in-progress or finished
+// visit to someone else would silently orphan whatever check-in/photos/forms already exist.
+const LOCKED_INSTANCE_STATUSES = ['IN_PROGRESS', 'COMPLETED', 'CLOSED'] as const;
 
 const ASSIGNMENT_INCLUDE = {
   team: { select: { id: true, name: true } },
@@ -14,7 +20,10 @@ type AssignmentWithRelations = Prisma.UserAssignmentGetPayload<{ include: typeof
 
 @Injectable()
 export class AssignmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /**
    * UserAssignment.userId is a plain scalar FK — the schema declares no Prisma relation from
@@ -109,16 +118,33 @@ export class AssignmentsService {
     });
   }
 
-  async update(tenant: TenantContext, assignmentId: string, dto: UpdateAssignmentDto) {
+  async update(tenant: TenantContext, assignmentId: string, dto: UpdateAssignmentDto, actorUserId: string) {
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       const existing = await tx.userAssignment.findFirst({ where: { id: assignmentId, campaignId: tenant.campaignId } });
       if (!existing) throw new NotFoundException('Assignment not found');
 
-      if (dto.userId) {
+      const isReassignment = dto.userId !== undefined && dto.userId !== existing.userId;
+
+      if (isReassignment) {
         const membership = await tx.userCampaignRole.findFirst({
           where: { userId: dto.userId, campaignId: tenant.campaignId, status: 'ACTIVE' },
         });
         if (!membership) throw new BadRequestException('That user does not hold an active role in this campaign');
+
+        if (existing.pjpRowId) {
+          const lockedInstance = await tx.activityInstance.findFirst({
+            where: {
+              pjpRowId: existing.pjpRowId,
+              assignedUserId: existing.userId,
+              status: { in: [...LOCKED_INSTANCE_STATUSES] },
+            },
+          });
+          if (lockedInstance) {
+            throw new BadRequestException(
+              'This assignment already has field activity in progress or completed — it can no longer be reassigned to someone else.',
+            );
+          }
+        }
       }
 
       const updated = await tx.userAssignment.update({
@@ -130,6 +156,20 @@ export class AssignmentsService {
         },
         include: ASSIGNMENT_INCLUDE,
       });
+
+      if (isReassignment) {
+        await this.audit.record(tx, {
+          clientId: tenant.clientId,
+          campaignId: tenant.campaignId,
+          actorUserId,
+          action: 'ASSIGNMENT_REASSIGNED',
+          entityType: 'UserAssignment',
+          entityId: assignmentId,
+          before: { userId: existing.userId },
+          after: { userId: updated.userId },
+        });
+      }
+
       const [withName] = await this.attachUserNames(tx, [updated]);
       return withName;
     });

@@ -1,8 +1,26 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 20 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1 GPS/route/deviation, 4.2 Device-risk controls, 4.3 Sales & stock reconciliation + Attendance) — S4.3 confirmed working by the founder on their own phone (Attendance day-start/day-end tested live); awaiting formal approval to close Stage 4 and move to Stage 5.**
+**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module: attendance view, unsynced users, delayed activities, team performance, reassignment) — built, all checks passing, awaiting founder review.**
 
-## S4.3 — Sales & stock reconciliation + Attendance (this session, after founder said "please go ahead")
+## S5.1 — Supervisor module (this session, after founder said "please go ahead" to start Stage 5)
+
+Per `docs/architecture/09-mvp-build-sequence.md` S5.1: "Supervisor module complete (attendance, unsynced users, delayed activities, team performance, reassignment)."
+
+- **A new Team Dashboard page** for supervisors — four views in one place: **Attendance** (everyone's day-start/day-end for the day, at a glance), **Unsynced users** (field workers who haven't been heard from by the server in a while — a check-in, check-out, GPS ping, or attendance mark), **Delayed activities** (today's stops running behind their planned check-in/check-out time), and **Team performance** (assigned/in-progress/completed counts and completion rate per person).
+- **Reassignment was actually already half-built** from early in the project — the Assignments page could technically change who a stop was assigned to, just without two things a real tool needs: it would happily let you reassign a visit the original person had *already started or finished* (silently leaving their check-in/photos stranded under the old name), and it didn't leave a record of who reassigned what. Both fixed — reassigning a started/finished visit is now refused with a clear message, and every reassignment is logged. The Assignments page now has a proper "Reassign to" option.
+- **Honest note on "unsynced users":** the server can only ever know when it last *heard* from someone's phone — it has no way to see data still sitting on the phone that hasn't been sent yet (that's the whole point of working offline). This view is a "haven't heard from this device in a while" proxy, not a literal count of pending items, and says so on the page itself.
+- **Deliberately not built yet**, per the build plan's own staging: the live map, the exceptions inbox, WhatsApp verification, and team communication — all explicitly later pieces (S5.2/S5.3), not silently skipped.
+- **Verified**: builds clean (backend + web); full regression suite still passing; all four dashboard views and the hardened reassignment tested live against a real backend — including deliberately creating a test stop that was overdue, confirming it showed up correctly in three different views, then confirming reassignment works before a visit starts and is correctly refused once it's started.
+
+### Reviewing S5.1 — Supervisor module
+
+1. `git pull` and restart (`./scripts/bootstrap.sh`).
+2. Log in as Rohan Mehta (`9000000001`) and open the new **Team Dashboard** page in the sidebar.
+3. **Attendance tab**: you should see everyone with a role on the campaign, with today's start/end times if they've marked them (try it yourself on your phone from the S4.3 review steps, then refresh this tab).
+4. **Unsynced users / Delayed activities / Team performance tabs**: these depend on today's assignments — with the current seed data these may show empty, which is correct, not broken (nothing is scheduled for today yet). If you want to see them populated, ask and a fresh test PJP row can be added for today.
+5. On the **Assignments** page, click any assignment to edit it — you should now see a "Reassign to" dropdown alongside the status field. Try reassigning one that hasn't been checked in yet — it should succeed. (Reassigning one that's already in progress or completed should be refused with a clear message — this needs a checked-in test visit to try, not something the current seed data has ready-made.)
+
+## S4.3 — Sales & stock reconciliation + Attendance
 
 Per `docs/architecture/09-mvp-build-sequence.md` S4.3: "Sales & stock — SKU reporting, reconciliation formula, mismatch exceptions. Attendance day-start/day-end."
 
@@ -628,7 +646,9 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 17. **Correction to item 16**: Stage 4 actually has three parts per the build plan (S4.1, S4.2, S4.3), not two — S4.3 was still open, not a separate later stage. You said "Please go ahead" and S4.3 has now been built (see below); Stage 4 is only fully closed once you approve this too.
 18. **S4.3 (Sales & stock reconciliation + Attendance) — CONFIRMED WORKING on your phone**, 20 July 2026. Good news found along the way: the "mismatch generates an exception" part of stock reconciliation was actually already working since Stage 3.1 — just never called out clearly before. The one genuinely new piece, Attendance (day-start/day-end), you tested yourself: logged in, tapped "Start my day" (recorded 12:31 PM), then "End my day" (recorded 12:32 PM) — both worked correctly.
 19. **The "session timeout" you saw along the way turned out not to be a bug in the app.** The actual causes were three separate, ordinary test-setup snags, found and cleared one by one with you: (a) `flutter run` needed to be pointed at your computer's network address for a real phone, not the default emulator-only address; (b) your Wi-Fi wouldn't let the phone and computer talk directly, worked around with a USB connection instead; (c) your test account had hit its device-registration limit from repeated reinstalls during troubleshooting, and one device was stuck pending approval. All three are resolved now. A genuine, separate login-refresh bug (A-067) was also found and fixed along the way — real, but not what caused what you saw.
-20. **Approve S4.3, or request changes** — per process rules, this is a phase boundary. Once approved, Stage 4 (4.1 + 4.2 + 4.3) is fully closed.
+20. **Stage 4 (4.1 + 4.2 + 4.3) — APPROVED**, 20 July 2026 ("Please go ahead" after confirming S4.3 working on your phone).
+21. **Stage 5 (Command & control) starting now.** First piece: S5.1, the full Supervisor module (attendance, unsynced users, delayed activities, team performance, reassignment).
+22. **S5.1 (Supervisor module) — built, all checks passing, awaiting your review.** See "Reviewing S5.1" above — a new Team Dashboard page, and a proper "Reassign" option added to the Assignments page. This is a phase boundary — please approve or request changes before the next stage starts.
 
 ## How to see it yourself
 
