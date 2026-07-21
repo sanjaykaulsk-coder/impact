@@ -666,7 +666,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 20. **Stage 4 (4.1 + 4.2 + 4.3) — APPROVED**, 20 July 2026 ("Please go ahead" after confirming S4.3 working on your phone).
 21. **Stage 5 (Command & control) starting now.** First piece: S5.1, the full Supervisor module (attendance, unsynced users, delayed activities, team performance, reassignment).
 22. **S5.1 (Supervisor module) — APPROVED**, 21 July 2026. You personally tested reassignment on your own machine (correctly blocked on an already-started test visit, then correctly succeeded on a freshly created one) and confirmed it works as intended.
-23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — built, all checks passing, awaiting your review.** See "Reviewing S5.2" above. This is a phase boundary — please approve or request changes before the next stage starts.
+23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — WhatsApp verification CONFIRMED WORKING on your own machine**, 21 July 2026. You created a fresh test visit, found it in Approvals, approved it, clicked "Start Verification Call" (correctly opened WhatsApp Web), then "Mark complete" to log the outcome — the full flow end to end. Exceptions and Alerts pages weren't tested live since there's currently nothing in your data to show on them (both correctly displayed empty, not broken) — ask any time if you'd like a test one added to click through. This is a phase boundary — please approve or request changes before the next stage starts.
 
 ## How to see it yourself
 
