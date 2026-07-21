@@ -1,7 +1,11 @@
 import type {
+  ActionTakenRequest,
   ActivityTemplateSummary,
+  AlertRecord,
+  AlertStatus,
   ApplyActivityTemplateRequest,
   ApprovalDecisionStatus,
+  AssignExceptionRequest,
   AssignmentSummary,
   AvailableAssignmentUser,
   AvailablePjpRow,
@@ -10,6 +14,7 @@ import type {
   CampaignSkuResponse,
   CampaignSummary,
   ClientSummary,
+  CompleteWhatsAppVerificationRequest,
   CreateAssignmentRequest,
   CreateCampaignRequest,
   CreateClientRequest,
@@ -22,6 +27,8 @@ import type {
   DeviationRequestSummary,
   DeviceRiskAlert,
   DfrReportResponse,
+  ExceptionRecord,
+  ExceptionStatus,
   FormTemplateDetail,
   FormTemplateSummary,
   MeResponse,
@@ -35,9 +42,14 @@ import type {
   PostponePjpRowRequest,
   ReadinessRow,
   ReassignPjpRowRequest,
+  ReopenExceptionRequest,
   RequestOtpResponse,
   ReschedulePjpRowRequest,
+  ResolveAlertRequest,
+  ResolveExceptionRequest,
   RoleSummary,
+  StartWhatsAppVerificationRequest,
+  StartWhatsAppVerificationResponse,
   StockReconciliationRow,
   SupervisorInboxItem,
   TeamAttendanceRow,
@@ -53,6 +65,7 @@ import type {
   UpsertDraftFormRequest,
   UpsertWorkflowRequest,
   VerifyOtpResponse,
+  WhatsAppVerificationRecord,
   WorkflowResponse,
 } from '@impact/shared';
 
@@ -347,6 +360,53 @@ export const api = {
       request<TeamPerformanceRow[]>(
         `/campaigns/${campaignId}/team-dashboard/performance${from ? `?from=${from}${to ? `&to=${to}` : ''}` : ''}`,
       ),
+  },
+  exceptions: {
+    list: (campaignId: string, status?: ExceptionStatus) =>
+      request<ExceptionRecord[]>(`/campaigns/${campaignId}/exceptions${status ? `?status=${status}` : ''}`),
+    detail: (campaignId: string, exceptionId: string) => request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}`),
+    assign: (campaignId: string, exceptionId: string, dto: AssignExceptionRequest) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/assign`, { method: 'POST', body: JSON.stringify(dto) }),
+    acknowledge: (campaignId: string, exceptionId: string) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/acknowledge`, { method: 'POST' }),
+    startReview: (campaignId: string, exceptionId: string) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/start-review`, { method: 'POST' }),
+    actionTaken: (campaignId: string, exceptionId: string, dto: ActionTakenRequest) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/action-taken`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
+    resolve: (campaignId: string, exceptionId: string, dto: ResolveExceptionRequest) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/resolve`, { method: 'POST', body: JSON.stringify(dto) }),
+    approveClosure: (campaignId: string, exceptionId: string) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/approve-closure`, { method: 'POST' }),
+    reopen: (campaignId: string, exceptionId: string, dto: ReopenExceptionRequest) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/reopen`, { method: 'POST', body: JSON.stringify(dto) }),
+    escalate: (campaignId: string, exceptionId: string) =>
+      request<ExceptionRecord>(`/campaigns/${campaignId}/exceptions/${exceptionId}/escalate`, { method: 'POST' }),
+  },
+  alerts: {
+    list: (campaignId: string, status?: AlertStatus) => request<AlertRecord[]>(`/campaigns/${campaignId}/alerts${status ? `?status=${status}` : ''}`),
+    acknowledge: (campaignId: string, alertId: string) =>
+      request<AlertRecord>(`/campaigns/${campaignId}/alerts/${alertId}/acknowledge`, { method: 'POST' }),
+    resolve: (campaignId: string, alertId: string, dto: ResolveAlertRequest) =>
+      request<AlertRecord>(`/campaigns/${campaignId}/alerts/${alertId}/resolve`, { method: 'POST', body: JSON.stringify(dto) }),
+    escalate: (campaignId: string, alertId: string) =>
+      request<AlertRecord>(`/campaigns/${campaignId}/alerts/${alertId}/escalate`, { method: 'POST' }),
+  },
+  whatsappVerification: {
+    history: (campaignId: string, activityInstanceId: string) =>
+      request<WhatsAppVerificationRecord[]>(`/campaigns/${campaignId}/activity-instances/${activityInstanceId}/whatsapp-verification`),
+    start: (campaignId: string, activityInstanceId: string, dto: StartWhatsAppVerificationRequest) =>
+      request<StartWhatsAppVerificationResponse>(`/campaigns/${campaignId}/activity-instances/${activityInstanceId}/whatsapp-verification/start`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
+    complete: (campaignId: string, verificationId: string, dto: CompleteWhatsAppVerificationRequest) =>
+      request<WhatsAppVerificationRecord>(`/campaigns/${campaignId}/whatsapp-verification/${verificationId}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
   },
   workflow: {
     get: (campaignId: string) => request<WorkflowResponse | null>(`/campaigns/${campaignId}/workflow`),

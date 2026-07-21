@@ -1262,6 +1262,7 @@ model ActivityInstance {
   exceptions            Exception[]
   alerts                Alert[]
   sopChecklistResponses SopChecklistResponse[]
+  whatsappVerifications WhatsAppVerification[]
 
   @@index([campaignId])
   @@index([clientId])
@@ -1797,4 +1798,27 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+// Spec §31 "WhatsApp video verification (v1 approach)": a supervisor-initiated call logged for
+// audit, never the call content itself — "never store WhatsApp call recordings or private call
+// data" is honored by design, since this table only ever holds metadata the supervisor types in.
+model WhatsAppVerification {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId           String           @db.Uuid
+  campaignId         String           @db.Uuid
+  activityInstanceId String           @db.Uuid
+  activityInstance   ActivityInstance @relation(fields: [activityInstanceId], references: [id], onDelete: Cascade)
+  initiatedByUserId  String           @db.Uuid
+  verificationType   String
+  startedAt          DateTime         @default(now())
+  completedAt        DateTime?
+  outcome            String?
+  remarks            String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("whatsapp_verifications")
 }

@@ -2,8 +2,11 @@
 
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import type { ApprovalDecisionStatus, SupervisorInboxItem } from '@impact/shared';
+import type { ApprovalDecisionStatus, SupervisorInboxItem, WhatsAppVerificationOutcome, WhatsAppVerificationRecord, WhatsAppVerificationType } from '@impact/shared';
 import { useEffect, useState } from 'react';
+
+const VERIFICATION_TYPES: WhatsAppVerificationType[] = ['GENERAL', 'SETUP', 'BRANDING_INSPECTION', 'REMOTE_SUPPORT'];
+const OUTCOMES: WhatsAppVerificationOutcome[] = ['VERIFIED_OK', 'ISSUE_FOUND', 'COULD_NOT_CONNECT'];
 
 const TABS: ApprovalDecisionStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
 
@@ -16,6 +19,13 @@ export default function ApprovalsPage() {
 
   const [remarks, setRemarks] = useState('');
   const [deciding, setDeciding] = useState(false);
+
+  const [verifications, setVerifications] = useState<WhatsAppVerificationRecord[]>([]);
+  const [verificationType, setVerificationType] = useState<WhatsAppVerificationType>('GENERAL');
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<WhatsAppVerificationOutcome>('VERIFIED_OK');
+  const [verificationRemarks, setVerificationRemarks] = useState('');
+  const [verificationBusy, setVerificationBusy] = useState(false);
 
   const activeCampaign = campaigns.find((c) => c.campaignId === selectedCampaignId);
   const selected = items?.find((i) => i.approvalId === selectedId) ?? null;
@@ -30,12 +40,58 @@ export default function ApprovalsPage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load the review queue'));
   };
 
+  const loadVerifications = (activityInstanceId: string) => {
+    if (!selectedCampaignId) return;
+    api.whatsappVerification
+      .history(selectedCampaignId, activityInstanceId)
+      .then(setVerifications)
+      .catch(() => setVerifications([]));
+  };
+
   useEffect(() => {
     load();
     setSelectedId(null);
     setRemarks('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCampaignId, tab]);
+
+  useEffect(() => {
+    if (selected) loadVerifications(selected.activity.id);
+    setCompletingId(null);
+    setVerificationRemarks('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  const startVerification = async () => {
+    if (!selectedCampaignId || !selected) return;
+    setVerificationBusy(true);
+    setError(null);
+    try {
+      const result = await api.whatsappVerification.start(selectedCampaignId, selected.activity.id, { verificationType });
+      window.open(result.waLink, '_blank', 'noopener,noreferrer');
+      loadVerifications(selected.activity.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not start the verification call');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const completeVerification = async (verificationId: string) => {
+    if (!selectedCampaignId || !selected) return;
+    setVerificationBusy(true);
+    setError(null);
+    try {
+      await api.whatsappVerification.complete(selectedCampaignId, verificationId, { outcome, remarks: verificationRemarks.trim() || undefined });
+      setCompletingId(null);
+      setVerificationRemarks('');
+      loadVerifications(selected.activity.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save the verification outcome');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
 
   const decide = async (decision: 'APPROVED' | 'REJECTED') => {
     if (!selectedCampaignId || !selected) return;
@@ -204,6 +260,75 @@ export default function ApprovalsPage() {
                 </tbody>
               </table>
             )}
+
+            <h3 style={{ marginTop: 20 }}>WhatsApp verification</h3>
+            <p className="subtitle">
+              Start a call on WhatsApp to visually confirm something (stall setup, branding, etc.) — this opens your own
+              WhatsApp, never records the call itself, only that it happened and the outcome.
+            </p>
+            {verifications.length > 0 && (
+              <table className="data-table" style={{ marginBottom: 12 }}>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Started</th>
+                    <th>Outcome</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications.map((v) => (
+                    <tr key={v.id}>
+                      <td>{v.verificationType}</td>
+                      <td>{new Date(v.startedAt).toLocaleString()}</td>
+                      <td>
+                        {v.outcome ? (
+                          `${v.outcome}${v.remarks ? ` — ${v.remarks}` : ''}`
+                        ) : completingId === v.id ? (
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <select value={outcome} onChange={(e) => setOutcome(e.target.value as WhatsAppVerificationOutcome)}>
+                              {OUTCOMES.map((o) => (
+                                <option key={o} value={o}>
+                                  {o}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              placeholder="Remarks (optional)"
+                              value={verificationRemarks}
+                              onChange={(e) => setVerificationRemarks(e.target.value)}
+                              style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
+                            />
+                            <button className="btn-primary inline" disabled={verificationBusy} onClick={() => completeVerification(v.id)}>
+                              Save
+                            </button>
+                          </div>
+                        ) : (
+                          <button className="btn-secondary" onClick={() => setCompletingId(v.id)}>
+                            Mark complete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                value={verificationType}
+                onChange={(e) => setVerificationType(e.target.value as WhatsAppVerificationType)}
+                style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8 }}
+              >
+                {VERIFICATION_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <button className="btn-secondary" disabled={verificationBusy} onClick={startVerification}>
+                {verificationBusy ? 'Starting…' : 'Start Verification Call'}
+              </button>
+            </div>
 
             {selected.status === 'PENDING' && (
               <div style={{ marginTop: 20 }}>

@@ -1,6 +1,23 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module) — APPROVED, 21 July 2026, founder-tested reassignment on their own machine. Next: S5.2 (Exception tickets + in-app alerts + WhatsApp adapter), awaiting founder go-ahead.**
+**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module) — APPROVED. S5.2 (Exception tickets + in-app alerts + WhatsApp adapter) — built, all checks passing, awaiting founder review.**
+
+## S5.2 — Exception tickets, in-app alerts, WhatsApp verification (this session, after founder said "please go ahead")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S5.2: "Exception tickets (full lifecycle) + Module 17 in-app alerts + Module 18 WhatsApp adapter with escalation ladders."
+
+- **A real Exceptions page.** The system has quietly been detecting real problems since early in the build (like a stock count that doesn't add up) but there was nowhere to actually see and work through them. Now there is: a ticket moves through Detected → Assigned → Acknowledged → Under review → Action taken → Resolved → Closed (or Reopened if something new comes up), with a full history of who did what.
+- **A general Alerts page.** The Device Risk page you already know about is actually a special-purpose view of a broader "alerts" system — this adds the general view, so anything flagged anywhere in the system (not just device problems) has somewhere to be seen and cleared.
+- **Escalation is now real, not just a counter.** If a supervisor doesn't act on something, escalating it now genuinely notifies their manager (using the reporting-line structure already set up for each campaign) — both as an in-app notification and a WhatsApp message (still using the same safe MOCK system as OTP login — no real WhatsApp messages are sent in development, everything is logged to the terminal instead). If no manager is configured for someone, escalating still marks the ticket as escalated so nothing gets stuck, it just won't have anyone new to notify.
+- **What's still honestly not there yet**: escalation only happens when a supervisor clicks the button — the fancier "escalates itself automatically after 15/30/60 minutes" version needs a scheduling system this project doesn't have yet, and isn't worth building just for this one feature. Also, the WhatsApp and in-app channels are real; a "push notification to your phone" channel is not — no app on any phone can currently receive one.
+- **WhatsApp verification.** On the Approvals page, opening any submission now shows a "Start Verification Call" button — click it and it opens WhatsApp addressed to that field worker, for cases where a supervisor wants to see something live (a stall setup, a branding install) rather than just from photos. Nothing about the call itself is recorded — only that it happened and what the supervisor decided afterward.
+- **Verified**: builds clean (backend + web); full regression suite still passing; every new feature tested live end-to-end against a real backend, including walking a test exception through its entire life from detection to closure, and testing escalation both with and without a manager configured.
+
+### Reviewing S5.2 — Exception tickets, in-app alerts, WhatsApp verification
+
+1. `git pull` and restart (`./scripts/bootstrap.sh`).
+2. Log in as Rohan Mehta (`9000000001`) and open the new **Exceptions** and **Alerts** pages in the sidebar. With the current seed data these will likely both be empty — that's correct, not broken. If you want to see one populated, ask and a test exception can be added for you to walk through.
+3. On the **Approvals** page, click into any submission — scroll down and you'll see the new "WhatsApp verification" section with a "Start Verification Call" button. Try it — it should open WhatsApp addressed to the field worker's number.
 
 ## S5.1 — Supervisor module (this session, after founder said "please go ahead" to start Stage 5)
 
@@ -649,6 +666,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 20. **Stage 4 (4.1 + 4.2 + 4.3) — APPROVED**, 20 July 2026 ("Please go ahead" after confirming S4.3 working on your phone).
 21. **Stage 5 (Command & control) starting now.** First piece: S5.1, the full Supervisor module (attendance, unsynced users, delayed activities, team performance, reassignment).
 22. **S5.1 (Supervisor module) — APPROVED**, 21 July 2026. You personally tested reassignment on your own machine (correctly blocked on an already-started test visit, then correctly succeeded on a freshly created one) and confirmed it works as intended.
+23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — built, all checks passing, awaiting your review.** See "Reviewing S5.2" above. This is a phase boundary — please approve or request changes before the next stage starts.
 
 ## How to see it yourself
 

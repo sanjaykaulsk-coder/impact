@@ -895,3 +895,108 @@ export interface TeamPerformanceRow {
   cancelled: number;
   completionRate: number;
 }
+
+// ---------------------------------------------------------------------------------------------
+// S5.2 — Exception tickets, in-app alerts, WhatsApp verification (spec §§29-31)
+// ---------------------------------------------------------------------------------------------
+
+export type ExceptionStatus =
+  | 'DETECTED'
+  | 'ASSIGNED'
+  | 'ACKNOWLEDGED'
+  | 'UNDER_REVIEW'
+  | 'ACTION_TAKEN'
+  | 'RESOLVED'
+  | 'CLOSURE_APPROVED'
+  | 'REOPENED';
+
+export type ExceptionSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface ExceptionRecord {
+  id: string;
+  category: string;
+  severity: ExceptionSeverity;
+  triggerType: string;
+  activityInstanceId: string | null;
+  userId: string | null;
+  userFullName: string | null;
+  locationName: string | null;
+  ownerUserId: string | null;
+  ownerFullName: string | null;
+  escalationLevel: number;
+  status: ExceptionStatus;
+  evidenceJson: unknown;
+  remarks: string | null;
+  resolution: string | null;
+  resolvedAt: string | null;
+  closureApprovedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignExceptionRequest {
+  ownerUserId: string;
+}
+
+export interface ActionTakenRequest {
+  remarks: string;
+}
+
+export interface ResolveExceptionRequest {
+  resolution: string;
+}
+
+export interface ReopenExceptionRequest {
+  remarks: string;
+}
+
+export type AlertStatus = 'OPEN' | 'ACKNOWLEDGED' | 'ESCALATED' | 'RESOLVED';
+
+export interface AlertRecord {
+  id: string;
+  activityInstanceId: string | null;
+  userId: string | null;
+  userFullName: string | null;
+  locationId: string | null;
+  issueType: string;
+  severity: ExceptionSeverity;
+  timestamp: string;
+  ownerUserId: string | null;
+  ownerFullName: string | null;
+  status: AlertStatus;
+  remarks: string | null;
+  evidenceJson: unknown;
+  escalationLevel: number;
+  createdAt: string;
+}
+
+export interface ResolveAlertRequest {
+  remarks?: string;
+}
+
+export type WhatsAppVerificationType = 'GENERAL' | 'SETUP' | 'BRANDING_INSPECTION' | 'REMOTE_SUPPORT';
+export type WhatsAppVerificationOutcome = 'VERIFIED_OK' | 'ISSUE_FOUND' | 'COULD_NOT_CONNECT';
+
+export interface WhatsAppVerificationRecord {
+  id: string;
+  activityInstanceId: string;
+  initiatedByUserId: string;
+  verificationType: WhatsAppVerificationType;
+  startedAt: string;
+  completedAt: string | null;
+  outcome: WhatsAppVerificationOutcome | null;
+  remarks: string | null;
+}
+
+export interface StartWhatsAppVerificationResponse extends WhatsAppVerificationRecord {
+  waLink: string;
+}
+
+export interface StartWhatsAppVerificationRequest {
+  verificationType: WhatsAppVerificationType;
+}
+
+export interface CompleteWhatsAppVerificationRequest {
+  outcome: WhatsAppVerificationOutcome;
+  remarks?: string;
+}
