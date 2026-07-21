@@ -1000,3 +1000,127 @@ export interface CompleteWhatsAppVerificationRequest {
   outcome: WhatsAppVerificationOutcome;
   remarks?: string;
 }
+
+// ---- S5.3: live dashboard + drill-down + live map command centre (spec §§26-28) ----
+
+export interface DashboardSummary {
+  date: string;
+  activities: {
+    planned: number;
+    started: number;
+    completed: number;
+    missed: number;
+    delayed: number;
+  };
+  attendance: {
+    totalMembers: number;
+    dayStarted: number;
+    dayEnded: number;
+  };
+  pendingApprovals: number;
+  pendingDeviations: number;
+  openExceptions: number;
+  offlineOrUnsyncedUsers: number;
+}
+
+export type DrillDownLevel = 'CAMPAIGN' | 'STATE' | 'DISTRICT' | 'TEHSIL' | 'LOCATION' | 'ACTIVITY';
+
+export interface DrillDownNameCount {
+  name: string;
+  count: number;
+}
+
+export interface DrillDownCampaignLevel {
+  level: 'CAMPAIGN';
+  states: DrillDownNameCount[];
+}
+
+export interface DrillDownStateLevel {
+  level: 'STATE';
+  districts: DrillDownNameCount[];
+}
+
+export interface DrillDownDistrictLevel {
+  level: 'DISTRICT';
+  tehsils: DrillDownNameCount[];
+}
+
+export interface DrillDownTehsilLevel {
+  level: 'TEHSIL';
+  locations: DrillDownNameCount[];
+}
+
+export interface DrillDownActivitySummary {
+  id: string;
+  status: string;
+  plannedDate: string;
+  actualStartAt: string | null;
+  actualEndAt: string | null;
+  assignedUserId: string | null;
+  userFullName: string | null;
+}
+
+export interface DrillDownLocationLevel {
+  level: 'LOCATION';
+  activities: DrillDownActivitySummary[];
+}
+
+export interface DrillDownEvidenceItem {
+  id: string;
+  mimeType: string;
+  variant: string;
+  capturedAt: string | null;
+}
+
+export interface DrillDownActivityLevel {
+  level: 'ACTIVITY';
+  activityInstance: {
+    id: string;
+    status: string;
+    riskLevel: string;
+    plannedDate: string;
+    actualStartAt: string | null;
+    actualEndAt: string | null;
+    workflowName: string | null;
+    currentStageName: string | null;
+    location: { state: string; district: string; tehsil: string; name: string } | null;
+  };
+  user: { id: string; fullName: string } | null;
+  reports: {
+    forms: { id: string; submittedAt: string | null; status: string }[];
+    stock: { id: string; createdAt: string }[];
+    sales: { id: string; totalValue: string; createdAt: string }[];
+  };
+  evidence: DrillDownEvidenceItem[];
+}
+
+export type DrillDownResponse =
+  | DrillDownCampaignLevel
+  | DrillDownStateLevel
+  | DrillDownDistrictLevel
+  | DrillDownTehsilLevel
+  | DrillDownLocationLevel
+  | DrillDownActivityLevel
+  | null;
+
+export type LiveMapStatus = 'RED_EXCEPTION' | 'BLACK_OFFLINE' | 'GREEN_ACTIVE' | 'AMBER_DELAYED' | 'BLUE_TRAVELLING' | 'GREY_NOT_STARTED';
+
+export interface LiveMapPoint {
+  userId: string;
+  fullName: string;
+  teamName: string | null;
+  vehicleInfo: string | null;
+  status: LiveMapStatus;
+  statusLabel: string;
+  plannedLocation: {
+    name: string;
+    state: string;
+    district: string;
+    tehsil: string;
+    latitude: string | null;
+    longitude: string | null;
+  } | null;
+  lastKnownLocation: { latitude: string; longitude: string; recordedAt: string } | null;
+  activityInstanceId: string | null;
+  activityStatus: string | null;
+}

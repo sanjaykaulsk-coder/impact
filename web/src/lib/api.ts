@@ -21,14 +21,17 @@ import type {
   CreateFormTemplateRequest,
   CreatePjpRequest,
   CreatePjpResponse,
+  DashboardSummary,
   DecideApprovalRequest,
   DecideDeviationRequestRequest,
   DelayedActivityRow,
   DeviationRequestSummary,
   DeviceRiskAlert,
   DfrReportResponse,
+  DrillDownResponse,
   ExceptionRecord,
   ExceptionStatus,
+  LiveMapPoint,
   FormTemplateDetail,
   FormTemplateSummary,
   MeResponse,
@@ -423,6 +426,19 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(dto),
       }),
+  },
+  dashboard: {
+    summary: (campaignId: string, date?: string) =>
+      request<DashboardSummary>(`/campaigns/${campaignId}/dashboard/summary${date ? `?date=${date}` : ''}`),
+    drillDown: (campaignId: string, params: { state?: string; district?: string; tehsil?: string; locationName?: string; activityInstanceId?: string }) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value) query.set(key, value);
+      }
+      const qs = query.toString();
+      return request<DrillDownResponse>(`/campaigns/${campaignId}/dashboard/drill-down${qs ? `?${qs}` : ''}`);
+    },
+    liveMap: (campaignId: string, date?: string) => request<LiveMapPoint[]>(`/campaigns/${campaignId}/dashboard/live-map${date ? `?date=${date}` : ''}`),
   },
 };
 

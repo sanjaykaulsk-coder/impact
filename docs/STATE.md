@@ -1,6 +1,42 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 (Exception tickets + in-app alerts + WhatsApp adapter) — APPROVED, 21 July 2026, all three pieces founder-tested. S5.3 (live dashboards + drill-down + live map command centre) starting now.**
+**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 (live dashboard + drill-down + live map command centre) — built, all checks passing, awaiting founder review.**
+
+## S5.3 — Live dashboard, drill-down, live map command centre (this session, after founder said "Approve S5.2, please go ahead")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S5.3: "Module 16 full: Live dashboard + drill-down (National→…→Evidence) + live map command centre feed."
+
+- **A new Overview page** — one screen with today's key numbers for the campaign (stops planned/started/completed/delayed/missed, how many people have started their day, pending approvals, pending deviation requests, open exceptions, offline/unsynced users), plus a click-through map of the campaign: click a state to see its districts, click a district to see its tehsils, click a tehsil to see its locations, click a location to see every stop planned there today, click a stop to see everything about it — who's assigned, its status, any forms/stock/sales reports filed, and any photos taken.
+- **A new Live Map page** — one row per field worker with an assignment today, showing where they are (or last were), whether they're travelling, on-site, running late, flagged with a problem, or not heard from in a while, plus their team's van/bike if one is on file. Each row has a "View on map" link that opens their last known location in Google Maps.
+- **Honest scope decision — no "national" cross-campaign view.** Everything above works one campaign at a time, the same way every other page in this system already does. A true "see every campaign for this client at once" view needs a genuinely different kind of access-control check this project doesn't have anywhere yet — not something to bolt on as an afterthought. This is a real, stated gap, not a silently narrowed feature; ask if you'd like it prioritized for a future stage.
+- **Honest scope decision — no interactive embedded map.** No map-drawing library (the kind that shows an actual scrollable map with pins) is part of this project yet — adding one is a real new decision (which provider, whether it needs a paid API key) that shouldn't be snuck in as a side effect of this feature. Every location is still shown as text with a "View on map" link that opens Google Maps in a new tab, so you can still see it on a real map — just not embedded directly in the page.
+- **Verified**: builds clean (backend + web); full regression suite still passing; all three new views tested live end-to-end against a real backend — the full drill-down walked start to finish from campaign down to a single stop's evidence, and the live map's six statuses (needs attention, offline, active, delayed, travelling, not started) each confirmed to show correctly and in the right priority order when more than one applies at once.
+
+### Reviewing S5.3 — Live dashboard, drill-down, live map command centre
+
+1. `git pull` and restart (`./scripts/bootstrap.sh`).
+2. Log in as Rohan Mehta (`9000000001`) and open the new **Overview** page in the sidebar. You'll see today's numbers at the top (likely all zero or small, since this is a fresh day), and below that, click through **Bihar → Patna → Patna Sadar → Patna City Haat Ground** to see the one seeded stop there.
+3. Open the new **Live Map** page. If no one has an assignment for today, this will show "No one is assigned today" — that's correct, not broken. If you'd like to see it populated, run the terminal command below to create a fresh test assignment for today, then refresh the page.
+4. To create a fresh test assignment for today (so Overview and Live Map both have something to show), open a Terminal tab and run:
+   ```
+   cd ~/Desktop/impact-field-command
+   docker exec -it impact-field-command-postgres-1 psql -U impact -d impact_field_command -c "
+   WITH camp AS (SELECT id AS campaign_id, \"clientId\" AS client_id FROM campaigns WHERE name = 'Bihar Rural Van Outreach'),
+   rahul AS (SELECT id AS user_id FROM users WHERE \"fullName\" = 'Rahul Kumar'),
+   pjp AS (SELECT id AS pjp_id FROM pjps p, camp WHERE p.\"campaignId\" = camp.campaign_id LIMIT 1),
+   new_row AS (
+     INSERT INTO pjp_rows (id, \"clientId\", \"pjpId\", \"campaignId\", date, \"stateName\", \"districtName\", \"tehsilName\", \"locationName\", \"plannedStartTime\", \"plannedEndTime\", status, \"createdAt\", \"updatedAt\")
+     SELECT gen_random_uuid(), camp.client_id, pjp.pjp_id, camp.campaign_id, now(), 'Bihar', 'Patna', 'Patna Sadar', 'Live Map Test Stop', now() - interval '1 hour', now() + interval '2 hour', 'ACTIVE', now(), now()
+     FROM camp, pjp
+     RETURNING id, \"campaignId\", \"clientId\"
+   )
+   INSERT INTO user_assignments (id, \"campaignId\", \"clientId\", \"userId\", \"pjpRowId\", \"assignedById\", \"assignmentDate\", status, \"createdAt\", \"updatedAt\")
+   SELECT gen_random_uuid(), new_row.\"campaignId\", new_row.\"clientId\", rahul.user_id, new_row.id, rahul.user_id, now(), 'ASSIGNED', now(), now()
+   FROM new_row, rahul
+   RETURNING id;
+   "
+   ```
+   Refresh the Live Map page — Rahul Kumar should now appear, most likely marked "Offline / no recent location" (no phone signal for this test row yet, which is correct).
 
 ## S5.2 — Exception tickets, in-app alerts, WhatsApp verification (this session, after founder said "please go ahead")
 
@@ -668,6 +704,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 22. **S5.1 (Supervisor module) — APPROVED**, 21 July 2026. You personally tested reassignment on your own machine (correctly blocked on an already-started test visit, then correctly succeeded on a freshly created one) and confirmed it works as intended.
 23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — CONFIRMED WORKING on your own machine, all three pieces**, 21 July 2026. WhatsApp verification: created a fresh test visit, found it in Approvals, approved it, started a verification call (correctly opened WhatsApp Web), then marked it complete. Exceptions: a test exception was added to your data and you walked it through its stages. Alerts: a test alert was added and you confirmed it works. This is a phase boundary — please approve or request changes before the next stage starts.
 24. **S5.2 — APPROVED**, 21 July 2026 ("Approve S5.2, please go ahead"). Stage 5 continues with S5.3: live dashboards, drill-down (National → Client → Campaign → State → District → Tehsil → Location → Activity → User → Report → Evidence), and the live map command centre.
+25. **S5.3 (live dashboard + drill-down + live map command centre) — built, all checks passing, awaiting your review.** Two new pages: **Overview** (today's numbers + click-through drill-down from state all the way to a single stop's evidence) and **Live Map** (where every field worker with an assignment today is, or last was, at a glance). One honest, stated gap: this works one campaign at a time like everything else in the system — a true "see every campaign for this client at once" view is a bigger piece of work not included here. See "Reviewing S5.3" above for how to try it, including a terminal command to create fresh test data since a normal day may show mostly zeros. This is a phase boundary — please approve or request changes before the next stage starts.
 
 ## How to see it yourself
 

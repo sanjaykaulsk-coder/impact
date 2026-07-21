@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExceptionsModule } from './modules/exceptions/exceptions.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { FormsModule } from './modules/forms/forms.module';
@@ -39,6 +40,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     AssignmentsModule,
     CampaignsModule,
     ClientsModule,
+    DashboardModule,
     ExceptionsModule,
     ExecutionModule,
     FormsModule,
