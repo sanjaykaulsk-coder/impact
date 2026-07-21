@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module) — APPROVED. S5.2 (Exception tickets + in-app alerts + WhatsApp adapter) — built, all checks passing, awaiting founder review.**
+**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 (Exception tickets + in-app alerts + WhatsApp adapter) — APPROVED, 21 July 2026, all three pieces founder-tested. S5.3 (live dashboards + drill-down + live map command centre) starting now.**
 
 ## S5.2 — Exception tickets, in-app alerts, WhatsApp verification (this session, after founder said "please go ahead")
 
@@ -667,6 +667,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 21. **Stage 5 (Command & control) starting now.** First piece: S5.1, the full Supervisor module (attendance, unsynced users, delayed activities, team performance, reassignment).
 22. **S5.1 (Supervisor module) — APPROVED**, 21 July 2026. You personally tested reassignment on your own machine (correctly blocked on an already-started test visit, then correctly succeeded on a freshly created one) and confirmed it works as intended.
 23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — CONFIRMED WORKING on your own machine, all three pieces**, 21 July 2026. WhatsApp verification: created a fresh test visit, found it in Approvals, approved it, started a verification call (correctly opened WhatsApp Web), then marked it complete. Exceptions: a test exception was added to your data and you walked it through its stages. Alerts: a test alert was added and you confirmed it works. This is a phase boundary — please approve or request changes before the next stage starts.
+24. **S5.2 — APPROVED**, 21 July 2026 ("Approve S5.2, please go ahead"). Stage 5 continues with S5.3: live dashboards, drill-down (National → Client → Campaign → State → District → Tehsil → Location → Activity → User → Report → Evidence), and the live map command centre.
 
 ## How to see it yourself
 
