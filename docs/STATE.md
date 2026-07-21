@@ -1,6 +1,6 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module: attendance view, unsynced users, delayed activities, team performance, reassignment) — built, all checks passing, awaiting founder review.**
+**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 (Supervisor module) — APPROVED, 21 July 2026, founder-tested reassignment on their own machine. Next: S5.2 (Exception tickets + in-app alerts + WhatsApp adapter), awaiting founder go-ahead.**
 
 ## S5.1 — Supervisor module (this session, after founder said "please go ahead" to start Stage 5)
 
@@ -648,7 +648,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 19. **The "session timeout" you saw along the way turned out not to be a bug in the app.** The actual causes were three separate, ordinary test-setup snags, found and cleared one by one with you: (a) `flutter run` needed to be pointed at your computer's network address for a real phone, not the default emulator-only address; (b) your Wi-Fi wouldn't let the phone and computer talk directly, worked around with a USB connection instead; (c) your test account had hit its device-registration limit from repeated reinstalls during troubleshooting, and one device was stuck pending approval. All three are resolved now. A genuine, separate login-refresh bug (A-067) was also found and fixed along the way — real, but not what caused what you saw.
 20. **Stage 4 (4.1 + 4.2 + 4.3) — APPROVED**, 20 July 2026 ("Please go ahead" after confirming S4.3 working on your phone).
 21. **Stage 5 (Command & control) starting now.** First piece: S5.1, the full Supervisor module (attendance, unsynced users, delayed activities, team performance, reassignment).
-22. **S5.1 (Supervisor module) — built, all checks passing, awaiting your review.** See "Reviewing S5.1" above — a new Team Dashboard page, and a proper "Reassign" option added to the Assignments page. This is a phase boundary — please approve or request changes before the next stage starts.
+22. **S5.1 (Supervisor module) — APPROVED**, 21 July 2026. You personally tested reassignment on your own machine (correctly blocked on an already-started test visit, then correctly succeeded on a freshly created one) and confirmed it works as intended.
 
 ## How to see it yourself
 
