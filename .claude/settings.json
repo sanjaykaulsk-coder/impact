@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/qa-grep.sh)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm exec tsc *)",
+      "Bash(docker compose ps)"
+    ]
+  }
+}
