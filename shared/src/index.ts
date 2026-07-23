@@ -711,6 +711,106 @@ export interface StockReconciliationRow {
   mismatch: number | null;
 }
 
+export const KPI_KEYS = ['OUTLETS_VISITED', 'UNITS_SOLD', 'SALES_AMOUNT', 'LEADS_CONVERTED'] as const;
+export type KpiKey = (typeof KPI_KEYS)[number];
+
+export const KPI_KEY_LABELS: Record<KpiKey, string> = {
+  OUTLETS_VISITED: 'Outlets Visited',
+  UNITS_SOLD: 'Units Sold',
+  SALES_AMOUNT: 'Sales Amount',
+  LEADS_CONVERTED: 'Leads Converted',
+};
+
+export interface TargetResponse {
+  id: string;
+  kpiKey: string;
+  targetValue: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  createdAt: string;
+}
+
+export interface CreateTargetRequest {
+  kpiKey: string;
+  targetValue: number;
+  periodStart?: string;
+  periodEnd?: string;
+}
+
+export interface KpiAchievement {
+  kpiKey: string;
+  label: string;
+  targetValue: number;
+  actualValue: number;
+  achievementPercent: number | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+}
+
+export interface WeeklyReportTrendPoint {
+  date: string;
+  outletsVisited: number;
+  unitsSold: number;
+  salesAmount: number;
+}
+
+export interface WeeklyReportStateComparison {
+  state: string;
+  plannedStops: number;
+  completedStops: number;
+  completionRate: number;
+}
+
+export interface WeeklyReportDataQuality {
+  completedStops: number;
+  stopsWithNoPhotoEvidence: number;
+  stopsWithFormSubmittedOver24hLate: number;
+}
+
+export interface WeeklyReportExceptionCategory {
+  category: string;
+  count: number;
+}
+
+export interface WeeklyReportCorrectiveAction {
+  category: string;
+  severity: string;
+  resolution: string | null;
+  resolvedAt: string | null;
+}
+
+export interface WeeklyReportResponse {
+  period: { from: string | null; to: string | null };
+  trends: WeeklyReportTrendPoint[];
+  kpiAchievement: KpiAchievement[];
+  stateComparison: WeeklyReportStateComparison[];
+  teamPerformance: TeamPerformanceRow[];
+  dataQuality: WeeklyReportDataQuality;
+  recurringExceptions: WeeklyReportExceptionCategory[];
+  correctiveActions: WeeklyReportCorrectiveAction[];
+}
+
+export interface ClosureReportResponse {
+  overview: { campaignName: string; clientName: string; status: string; startDate: string; endDate: string | null } | null;
+  geography: { states: number; districts: number; tehsils: number; locations: number };
+  plannedVsExecuted: { plannedStops: number; completedStops: number; cancelledStops: number; completionRate: number };
+  kpiAchievement: KpiAchievement[];
+  sales: { totalUnitsSold: number; totalSalesAmount: number };
+  trials: { totalUnitsSampled: number };
+  leads: { total: number; byStatus: { status: string; count: number }[] };
+  activityCompletion: { activityTypeName: string; planned: number; completed: number }[];
+  evidence: { totalMediaCount: number; photoCount: number; videoCount: number; signatureCount: number };
+  routeCompliance: {
+    totalDeviationRequests: number;
+    approved: number;
+    rejected: number;
+    pending: number;
+    averageDistanceMeters: number | null;
+  };
+  operationalIssues: { totalExceptions: number; byCategory: WeeklyReportExceptionCategory[] };
+  learningsAndRecommendations: string | null;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stage 3.2 — Workflow builder + milestone engine + SOP checklists (spec §§11, 12, 16)
 // ---------------------------------------------------------------------------------------------

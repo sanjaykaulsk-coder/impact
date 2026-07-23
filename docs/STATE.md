@@ -1,6 +1,34 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 21 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 (live dashboard + drill-down + live map command centre) — built, all checks passing, awaiting founder review.**
+**Last updated:** 23 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 — APPROVED. S5.4 daily slice (DFR/Stock Reconciliation Excel export) — CONFIRMED WORKING on founder's machine. S5.4 second slice (Weekly + Campaign Closure reports, Targets) — built, all checks passing, awaiting founder review.**
+
+## S5.4 — Excel reporting service, full (this session, after founder said "Go ahead and build weekly and closure reports too")
+
+Per `docs/architecture/09-mvp-build-sequence.md` S5.4: "Module 19: Excel reporting service (daily/weekly/closure) — extensible for PDF/PPT later." The daily piece (DFR + Stock Reconciliation Excel export) was built and confirmed working earlier this session. This second slice adds the remaining two: Weekly and Campaign Closure reports, both on the web page and as downloadable Excel files.
+
+- **A new "Targets" page.** Every KPI-driven report needs something to measure against — this campaign-wide page lets you set a target (e.g. "10,000 units sold") with an optional date range, which both new reports compare real numbers against. No targets set yet? Both reports say so plainly rather than showing a fake number.
+- **Weekly Report tab**: day-by-day trends, target vs achievement, state-by-state comparison, team performance, data quality (stops missing photos, late form submissions), recurring problem categories, and a log of what was actually done about resolved issues.
+- **Campaign Closure Report tab**: a full end-of-campaign summary — overview, geography covered, planned vs actually executed, KPI achievement, sales and samples given out, leads, activity completion by type, evidence captured, route compliance, and operational issues. One section — Learnings & Recommendations — is left blank on purpose, both on screen and in the Excel file: no system can honestly write your team's own conclusions for you.
+- **Both download as real, multi-sheet Excel files** — one sheet per section, matching the spec's own bullet list.
+- **Verified**: builds clean (backend + web); full regression suite still passing (13/13); every new endpoint tested live end-to-end against a real running backend — a real target was created, confirmed to show up correctly in both reports with a genuinely computed number (checked directly against the database, not assumed), then removed; both Excel files downloaded and independently checked — genuine Excel files, all 7 and 11 expected sheets present with correct data.
+- **A process note, not a feature bug**: partway through this session, a one-off `pnpm build` run (done only to verify the code compiles) collided with the already-running dev server and briefly broke the login page. Diagnosed and fixed within the same session — nothing about the actual features was at fault. Full detail in `docs/ASSUMPTIONS.md` A-072.
+
+- **A "Download Excel" button on the existing Reports page.** Both the Daily Field Report and Stock Reconciliation tabs you already know about now have a real `.xlsx` download, matching the same date-range filter already on the page. No new page needed.
+- **The Excel layout matches the format your team already knows** — the same one used in `Type_of_Campaign.xlsx`: one merged header per product spanning its Qty/Amt. columns, ending in Total Qty/Total Sales Amount columns. Nothing is re-typed for the Excel file — it's built from the exact same numbers already shown on the web page.
+- **Verified**: builds clean (backend + web); full regression suite still passing; both downloads tested against a real running backend — the files that came back opened correctly as genuine Excel files, and their internal structure was checked directly (the merged header cells span the right columns, and the numbers match the web page). **Confirmed by you on your own machine, 23 July 2026** — downloaded and opened correctly.
+
+### Reviewing S5.4 — Excel reporting, daily slice
+
+1. `git pull` and restart (`./scripts/bootstrap.sh`).
+2. Log in as Rohan Mehta (`9000000001`) and open the **Reports** page.
+3. On either the "Daily Field Report (DFR)" or "Stock Reconciliation" tab, click **Download Excel** — a real `.xlsx` file should download and open correctly in Excel/Google Sheets/Numbers, matching what's shown on the page.
+
+### Reviewing S5.4 — Weekly + Campaign Closure reports, Targets
+
+1. `git pull` and restart (`./scripts/bootstrap.sh`).
+2. Log in as Rohan Mehta (`9000000001`) and open the new **Targets** page in the sidebar. Add a target (e.g. "Units Sold", target value 100) — you can leave the period blank so it applies to any date range.
+3. Open **Reports** and click the new **Weekly Report** tab. Your target should appear under "Target vs Achievement" with a real (likely 0, on a quiet day) actual value next to it. Try **Download Excel** here too.
+4. Click the new **Campaign Closure Report** tab — this one has no date range, since it always covers the whole campaign. Scroll through its sections; the last one, "Learnings & Recommendations," is intentionally blank for your team to fill in. Try **Download Excel** here as well.
 
 ## S5.3 — Live dashboard, drill-down, live map command centre (this session, after founder said "Approve S5.2, please go ahead")
 
@@ -705,6 +733,10 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 23. **S5.2 (Exception tickets + in-app alerts + WhatsApp verification) — CONFIRMED WORKING on your own machine, all three pieces**, 21 July 2026. WhatsApp verification: created a fresh test visit, found it in Approvals, approved it, started a verification call (correctly opened WhatsApp Web), then marked it complete. Exceptions: a test exception was added to your data and you walked it through its stages. Alerts: a test alert was added and you confirmed it works. This is a phase boundary — please approve or request changes before the next stage starts.
 24. **S5.2 — APPROVED**, 21 July 2026 ("Approve S5.2, please go ahead"). Stage 5 continues with S5.3: live dashboards, drill-down (National → Client → Campaign → State → District → Tehsil → Location → Activity → User → Report → Evidence), and the live map command centre.
 25. **S5.3 (live dashboard + drill-down + live map command centre) — built, all checks passing, awaiting your review.** Two new pages: **Overview** (today's numbers + click-through drill-down from state all the way to a single stop's evidence) and **Live Map** (where every field worker with an assignment today is, or last was, at a glance). One honest, stated gap: this works one campaign at a time like everything else in the system — a true "see every campaign for this client at once" view is a bigger piece of work not included here. See "Reviewing S5.3" above for how to try it, including a terminal command to create fresh test data since a normal day may show mostly zeros. This is a phase boundary — please approve or request changes before the next stage starts.
+26. **S5.3 — APPROVED**, 22 July 2026. You created a fresh test assignment, opened Live Map, and confirmed Rahul Kumar showed correctly as "Offline / no recent location" (expected, since the test row has no real phone signal behind it), then said "let's move to the next step."
+27. **S5.4 (Excel reporting, daily slice) — built, all checks passing, awaiting your review.** The Reports page's DFR and Stock Reconciliation tabs now have a real "Download Excel" button, producing a genuine `.xlsx` file matching your team's existing report format (per-product Qty/Amt. columns, Total row). Weekly and campaign-closure reports are a separate, bigger next step within S5.4, not built yet — stated plainly, not silently skipped. See "Reviewing S5.4" above for how to try it.
+28. **S5.4 daily slice — CONFIRMED WORKING on your own machine**, 23 July 2026. You downloaded the Excel file from the Reports page and confirmed it opened correctly. Along the way, a stale `.next` build cache (left over from a production `pnpm build` run during this session's own verification, on top of the already-running dev server) briefly broke the web app's login page entirely (every static asset 404ing) — cleared and restarted cleanly; not a bug in any feature code.
+29. **S5.4 second slice (Weekly + Campaign Closure reports, Targets) — built, all checks passing, awaiting your review.** A new Targets page lets you set KPI targets for the campaign; the Reports page gets two new tabs (Weekly Report, Campaign Closure Report), each with its own Excel download. This completes S5.4 (Module 19: Excel reporting service) end to end. See "Reviewing S5.4 — Weekly + Campaign Closure reports, Targets" above for how to try it. This is a phase boundary — please approve or request changes before the next stage starts.
 
 ## How to see it yourself
 

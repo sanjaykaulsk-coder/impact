@@ -22,6 +22,7 @@ import { PjpModule } from './modules/pjp/pjp.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SkusModule } from './modules/skus/skus.module';
 import { SupervisorModule } from './modules/supervisor/supervisor.module';
+import { TargetsModule } from './modules/targets/targets.module';
 import { TeamDashboardModule } from './modules/team-dashboard/team-dashboard.module';
 import { WhatsAppVerificationModule } from './modules/whatsapp-verification/whatsapp-verification.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
@@ -49,6 +50,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     ReportsModule,
     SkusModule,
     SupervisorModule,
+    TargetsModule,
     TeamDashboardModule,
     WhatsAppVerificationModule,
     WorkflowsModule,

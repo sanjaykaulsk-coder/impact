@@ -14,6 +14,7 @@ import type {
   CampaignSkuResponse,
   CampaignSummary,
   ClientSummary,
+  ClosureReportResponse,
   CompleteWhatsAppVerificationRequest,
   CreateAssignmentRequest,
   CreateCampaignRequest,
@@ -21,6 +22,7 @@ import type {
   CreateFormTemplateRequest,
   CreatePjpRequest,
   CreatePjpResponse,
+  CreateTargetRequest,
   DashboardSummary,
   DecideApprovalRequest,
   DecideDeviationRequestRequest,
@@ -55,6 +57,7 @@ import type {
   StartWhatsAppVerificationResponse,
   StockReconciliationRow,
   SupervisorInboxItem,
+  TargetResponse,
   TeamAttendanceRow,
   TeamPerformanceRow,
   TokenPair,
@@ -68,6 +71,7 @@ import type {
   UpsertDraftFormRequest,
   UpsertWorkflowRequest,
   VerifyOtpResponse,
+  WeeklyReportResponse,
   WhatsAppVerificationRecord,
   WorkflowResponse,
 } from '@impact/shared';
@@ -152,6 +156,24 @@ async function request<T>(path: string, init: RequestInit = {}, retry = true): P
   }
   if (!text) return undefined as T;
   return JSON.parse(text);
+}
+
+// Excel exports are binary, so they can't go through request<T>()'s JSON parsing — this fetches
+// the file with the same bearer-token auth as every other call, then hands the browser a real
+// download via a throwaway object URL (no reachable UI element is a plain, unauthenticated <a href>).
+async function downloadFile(path: string, filename: string): Promise<void> {
+  const access = tokenStore.access;
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: access ? { Authorization: `Bearer ${access}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, 'Could not download report');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 // Refresh tokens rotate server-side (each use invalidates the old one — token.service.ts's
@@ -288,6 +310,47 @@ export const api = {
         `/campaigns/${campaignId}/reports/stock-reconciliation${qs ? `?${qs}` : ''}`,
       );
     },
+    downloadDfrExcel: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(`/campaigns/${campaignId}/reports/dfr.xlsx${qs ? `?${qs}` : ''}`, 'DFR.xlsx');
+    },
+    downloadStockReconciliationExcel: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(
+        `/campaigns/${campaignId}/reports/stock-reconciliation.xlsx${qs ? `?${qs}` : ''}`,
+        'Stock-Reconciliation.xlsx',
+      );
+    },
+    weekly: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return request<WeeklyReportResponse>(`/campaigns/${campaignId}/reports/weekly${qs ? `?${qs}` : ''}`);
+    },
+    downloadWeeklyExcel: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(`/campaigns/${campaignId}/reports/weekly.xlsx${qs ? `?${qs}` : ''}`, 'Weekly-Report.xlsx');
+    },
+    closure: (campaignId: string) => request<ClosureReportResponse>(`/campaigns/${campaignId}/reports/closure`),
+    downloadClosureExcel: (campaignId: string) =>
+      downloadFile(`/campaigns/${campaignId}/reports/closure.xlsx`, 'Campaign-Closure-Report.xlsx'),
+  },
+  targets: {
+    list: (campaignId: string) => request<TargetResponse[]>(`/campaigns/${campaignId}/targets`),
+    create: (campaignId: string, dto: CreateTargetRequest) =>
+      request<TargetResponse>(`/campaigns/${campaignId}/targets`, { method: 'POST', body: JSON.stringify(dto) }),
+    remove: (campaignId: string, targetId: string) =>
+      request<{ id: string }>(`/campaigns/${campaignId}/targets/${targetId}`, { method: 'DELETE' }),
   },
   pjp: {
     list: (campaignId: string) => request<PjpSummary[]>(`/campaigns/${campaignId}/pjps`),

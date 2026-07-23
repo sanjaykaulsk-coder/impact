@@ -18,6 +18,7 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Campaigns', requiredPermission: 'edit', href: '/dashboard/campaigns' },
   { label: 'Forms', requiredPermission: 'manage_forms', href: '/dashboard/forms' },
   { label: 'SKU Master', requiredPermission: 'manage_forms', href: '/dashboard/skus' },
+  { label: 'Targets', requiredPermission: 'manage_forms', href: '/dashboard/targets' },
   { label: 'Activity Templates', requiredPermission: 'manage_forms', href: '/dashboard/activity-templates' },
   { label: 'Workflow Builder', requiredPermission: 'manage_forms', href: '/dashboard/workflow' },
   { label: 'PJP Upload', requiredPermission: 'manage_pjp', href: '/dashboard/pjp' },

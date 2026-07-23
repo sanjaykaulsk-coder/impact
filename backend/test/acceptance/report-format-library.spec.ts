@@ -21,6 +21,7 @@ import { TenantContext } from '../../src/core/prisma/tenant-context';
 import { FormsService } from '../../src/modules/forms/forms.service';
 import { SkusService } from '../../src/modules/skus/skus.service';
 import { ReportsService } from '../../src/modules/reports/reports.service';
+import { TeamDashboardService } from '../../src/modules/team-dashboard/team-dashboard.service';
 import { ExecutionService } from '../../src/modules/execution/execution.service';
 import { buildArchetypeSections, skuBindingOf } from '../../src/modules/forms/archetypes';
 import { evaluateFormula, expectedClosingStock } from '../../src/modules/reports/formula';
@@ -40,7 +41,7 @@ process.env.APP_DATABASE_URL = APP_URL;
 const prismaService = new PrismaService();
 const formsService = new FormsService(prismaService);
 const skusService = new SkusService(prismaService);
-const reportsService = new ReportsService(prismaService);
+const reportsService = new ReportsService(prismaService, new TeamDashboardService(prismaService));
 // ExecutionService's storage, audit, and device-risk dependencies are only used by the
 // media/GPS/deviation endpoints, which this suite never touches — submitMilestoneResponse (the
 // path under test) needs none of them.
