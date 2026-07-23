@@ -579,6 +579,7 @@ model Campaign {
   workflows          Workflow[]
   auditLogs          AuditLog[]
   campaignSkus       CampaignSku[]
+  dashboardWidgets   DashboardWidgetConfig[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -905,6 +906,26 @@ model Target {
 
   @@index([campaignId])
   @@map("targets")
+}
+
+// Configurable dashboard engine (spec §26: "configurable engine; all KPIs client-specific";
+// Post-MVP backlog item, distinct from S5.3's fixed Impact-staff Overview page — see
+// docs/ASSUMPTIONS.md A-058/A-074). One row per widget an Impact admin has chosen to show on a
+// campaign's Client Dashboard, from a validated catalog (never a freeform widget name) — the same
+// "validated list, not invented" discipline as SKU movement types and Target's kpiKey.
+model DashboardWidgetConfig {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String   @db.Uuid
+  campaignId   String   @db.Uuid
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  widgetKey    String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+
+  @@unique([campaignId, widgetKey])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("dashboard_widget_configs")
 }
 
 // ============================================================================

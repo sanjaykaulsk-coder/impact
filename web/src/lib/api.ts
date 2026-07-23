@@ -13,6 +13,7 @@ import type {
   CancelPjpRowRequest,
   CampaignSkuResponse,
   CampaignSummary,
+  ClientDashboardResponse,
   ClientSummary,
   ClosureReportResponse,
   CompleteWhatsAppVerificationRequest,
@@ -24,6 +25,7 @@ import type {
   CreatePjpResponse,
   CreateTargetRequest,
   DashboardSummary,
+  DashboardWidgetConfigRow,
   DecideApprovalRequest,
   DecideDeviationRequestRequest,
   DelayedActivityRow,
@@ -53,6 +55,7 @@ import type {
   ResolveAlertRequest,
   ResolveExceptionRequest,
   RoleSummary,
+  SetDashboardConfigRequest,
   StartWhatsAppVerificationRequest,
   StartWhatsAppVerificationResponse,
   StockReconciliationRow,
@@ -376,6 +379,15 @@ export const api = {
       request<TargetResponse>(`/campaigns/${campaignId}/targets`, { method: 'POST', body: JSON.stringify(dto) }),
     remove: (campaignId: string, targetId: string) =>
       request<{ id: string }>(`/campaigns/${campaignId}/targets/${targetId}`, { method: 'DELETE' }),
+  },
+  clientDashboard: {
+    render: (campaignId: string) => request<ClientDashboardResponse>(`/campaigns/${campaignId}/client-dashboard`),
+    getConfig: (campaignId: string) => request<DashboardWidgetConfigRow[]>(`/campaigns/${campaignId}/client-dashboard/config`),
+    setConfig: (campaignId: string, dto: SetDashboardConfigRequest) =>
+      request<DashboardWidgetConfigRow[]>(`/campaigns/${campaignId}/client-dashboard/config`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      }),
   },
   pjp: {
     list: (campaignId: string) => request<PjpSummary[]>(`/campaigns/${campaignId}/pjps`),

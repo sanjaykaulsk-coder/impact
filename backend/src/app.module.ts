@@ -12,6 +12,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
+import { ClientDashboardModule } from './modules/client-dashboard/client-dashboard.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExceptionsModule } from './modules/exceptions/exceptions.module';
@@ -40,6 +41,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     AuthModule,
     AssignmentsModule,
     CampaignsModule,
+    ClientDashboardModule,
     ClientsModule,
     DashboardModule,
     ExceptionsModule,
