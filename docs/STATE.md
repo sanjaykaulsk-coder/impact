@@ -1,6 +1,21 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 23 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 — APPROVED. S5.4 — CONFIRMED WORKING on founder's machine (both daily slice and Weekly/Closure/Targets), 23 July 2026. This completes Stage 5 and the entire planned MVP build sequence (`docs/architecture/09-mvp-build-sequence.md`) — everything remaining is explicitly Post-MVP backlog.**
+**Last updated:** 23 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 — APPROVED. S5.4 — CONFIRMED WORKING on founder's machine (both daily slice and Weekly/Closure/Targets), 23 July 2026. This completed Stage 5 and the entire planned MVP build sequence (`docs/architecture/09-mvp-build-sequence.md`). Post-MVP backlog work now underway — PDF/PowerPoint report exports built, all checks passing, awaiting founder review.**
+
+## Post-MVP backlog — PDF/PowerPoint report exports (this session, after founder said "Start the work on Post MVP Backlog", chose "PDF / PPT reports" first)
+
+Per spec §32: "Report service must be extensible to PDF and PowerPoint later." All four reports (DFR, Stock Reconciliation, Weekly, Campaign Closure) get a **Download PDF** button; the Campaign Closure Report additionally gets a **Download PowerPoint** button, since that's the one report that's actually presented in a room, not read as a data grid.
+
+- **No new numbers anywhere** — every PDF/PPT is built from the exact same data the Excel exports already compute. Only the presentation layer is new.
+- **Verified**: builds clean (backend + web); full regression suite still passing (13/13); every new endpoint tested live end-to-end against a real running backend — all five downloads confirmed as genuine files (checked page counts and actual extracted text for the PDFs, actual slide content for the PowerPoint), including your own real Target showing up correctly.
+- **A formatting bug was caught and fixed during this session's own testing, before you ever saw it** — campaign dates initially printed in a raw, ugly format; fixed to a clean date before this was handed to you.
+
+### Reviewing — PDF/PowerPoint report exports
+
+1. Restart with `./scripts/bootstrap.sh` if needed (no new setup required otherwise).
+2. Open **Reports**, any tab — you'll see a new **Download PDF** button next to Download Excel.
+3. On the **Campaign Closure Report** tab specifically, you'll also see **Download PowerPoint**.
+4. Try a few — each should open correctly in your normal PDF viewer or PowerPoint/Keynote/Google Slides.
 
 ## S5.4 — Excel reporting service, full (this session, after founder said "Go ahead and build weekly and closure reports too")
 
@@ -738,6 +753,7 @@ post-mortem; checked the rest of the backend for the same shape, found no other 
 28. **S5.4 daily slice — CONFIRMED WORKING on your own machine**, 23 July 2026. You downloaded the Excel file from the Reports page and confirmed it opened correctly. Along the way, a stale `.next` build cache (left over from a production `pnpm build` run during this session's own verification, on top of the already-running dev server) briefly broke the web app's login page entirely (every static asset 404ing) — cleared and restarted cleanly; not a bug in any feature code.
 29. **S5.4 second slice (Weekly + Campaign Closure reports, Targets) — built, all checks passing, awaiting your review.** A new Targets page lets you set KPI targets for the campaign; the Reports page gets two new tabs (Weekly Report, Campaign Closure Report), each with its own Excel download. This completes S5.4 (Module 19: Excel reporting service) end to end. See "Reviewing S5.4 — Weekly + Campaign Closure reports, Targets" above for how to try it. This is a phase boundary — please approve or request changes before the next stage starts.
 30. **S5.4 — CONFIRMED WORKING on your own machine, both pieces**, 23 July 2026 ("just tested, weekly report and closure report both work"). This completes S5.4, which completes Stage 5, which completes the entire planned MVP build sequence in `docs/architecture/09-mvp-build-sequence.md` — every remaining item in that document is explicitly Post-MVP backlog (offline map corridors, a client-configurable dashboard-picker, PDF/PPT export, regional languages, AI image analysis, Impact IQ predictive features). Along the way, a git push from this session hit a real-world snag worth recording: the sandbox this build ran in has no way to authenticate to GitHub directly (no Keychain/credential access from its shell), so the S5.4 commit had to be pushed from your own Terminal instead, using a personal access token you generated — a one-time setup that your Mac should now remember via Keychain for future pushes. This is the biggest phase boundary yet — please confirm you're happy with the MVP as a whole before deciding what Post-MVP work (if any) to prioritise next.
+31. **Post-MVP backlog started — you picked PDF/PowerPoint report exports first.** Built and all checks passing: every report (DFR, Stock Reconciliation, Weekly, Campaign Closure) now has a "Download PDF" button, and Campaign Closure additionally has "Download PowerPoint" — the one report actually meant to be presented in a room. Nothing new was calculated; both formats reuse the exact same numbers the Excel exports already compute. See "Reviewing — PDF/PowerPoint report exports" above for how to try it. Awaiting your review.
 
 ## How to see it yourself
 

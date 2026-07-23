@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
+import PptxGenJS from 'pptxgenjs';
 import { KPI_KEYS, KPI_KEY_LABELS, KpiKey } from '../../common/kpi-keys';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { TeamDashboardService } from '../team-dashboard/team-dashboard.service';
 import { expectedClosingStock } from './formula';
+import { drawTable, newReportDoc, pdfToBuffer } from './pdf-table';
 
 // The DFR is a rollup query over record-level data, never a separately-entered table
 // (report-format-library §2): every number here is SUM(sku_movements) grouped by day/location,
@@ -755,5 +757,335 @@ export class ReportsService {
     learningsSheet.getColumn(1).width = 80;
 
     return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  // ==========================================================================
+  // PDF + PPTX (Post-MVP backlog item — see docs/ASSUMPTIONS.md A-073) — same
+  // principle as the Excel exports: a presentation layer over the exact same
+  // report data already computed above, never a second calculation.
+  // ==========================================================================
+
+  private fmtDate(d: Date | string | null | undefined): string {
+    if (!d) return '—';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    return date.toISOString().slice(0, 10);
+  }
+
+  private async campaignName(tenant: TenantContext): Promise<string> {
+    const campaign = await this.prisma.runInTenantContext(tenant.clientId, (tx) =>
+      tx.campaign.findUnique({ where: { id: tenant.campaignId }, select: { name: true } }),
+    );
+    return campaign?.name ?? 'Campaign';
+  }
+
+  private reportHeader(doc: PDFKit.PDFDocument, title: string, campaignName: string, subtitle?: string) {
+    doc.font('Helvetica-Bold').fontSize(16).text(title);
+    doc.font('Helvetica').fontSize(10).text(campaignName);
+    if (subtitle) doc.text(subtitle);
+    doc.moveDown(0.5);
+  }
+
+  async dfrPdf(tenant: TenantContext, from?: string, to?: string): Promise<Buffer> {
+    const [report, name] = await Promise.all([this.dfr(tenant, from, to), this.campaignName(tenant)]);
+    const skus = report.skus.filter((s) => s.isActive || report.rows.some((r) => r.cells[s.id]));
+
+    const doc = newReportDoc();
+    this.reportHeader(doc, 'Daily Field Report (DFR)', name, from || to ? `${from ?? '…'} to ${to ?? '…'}` : 'All time');
+
+    const headers = ['Date', 'Location', 'Records', ...skus.flatMap((s) => [`${s.name} Qty`, `${s.name} Amt.`]), 'Total Qty', 'Total Amt.'];
+    const fixedWidth = 60;
+    const skuColWidth = Math.max(40, Math.min(70, (doc.page.width - doc.page.margins.left - doc.page.margins.right - fixedWidth * 3 - fixedWidth * 2) / Math.max(1, skus.length * 2)));
+    const widths = [fixedWidth, 90, fixedWidth, ...skus.flatMap(() => [skuColWidth, skuColWidth]), fixedWidth, fixedWidth];
+
+    const rows = report.rows.map((r) => [
+      r.date,
+      r.locationName ?? '—',
+      r.recordCount,
+      ...skus.flatMap((s) => [r.cells[s.id]?.quantity ?? 0, r.cells[s.id]?.amount ?? 0]),
+      r.totalQuantity,
+      r.totalAmount,
+    ]);
+    rows.push(['Grand total', '', '', ...skus.flatMap(() => ['', '']), report.grandTotalQuantity, report.grandTotalAmount]);
+
+    drawTable(doc, { headers, widths, rows, boldLastRow: true });
+    doc.moveDown().font('Helvetica-Oblique').fontSize(8).text('For the full per-product breakdown, see the Excel export of this report.');
+
+    return pdfToBuffer(doc);
+  }
+
+  async stockReconciliationPdf(tenant: TenantContext, from?: string, to?: string): Promise<Buffer> {
+    const [rows, name] = await Promise.all([this.stockReconciliation(tenant, from, to), this.campaignName(tenant)]);
+    const doc = newReportDoc();
+    this.reportHeader(doc, 'Stock Reconciliation', name, from || to ? `${from ?? '…'} to ${to ?? '…'}` : 'All time');
+
+    drawTable(doc, {
+      headers: ['SKU', 'Opening', 'Received', 'Sold Qty', 'Sold Amt.', 'Scheme Qty', 'Scheme Value', 'Sampled', 'Damaged', 'Expected', 'Actual', 'Mismatch'],
+      widths: [110, 55, 55, 55, 55, 55, 60, 55, 55, 55, 55, 55],
+      rows: rows.map((r) => [
+        r.sku.name + (r.sku.variantLabel ? ` (${r.sku.variantLabel})` : ''),
+        r.openingStock,
+        r.received,
+        r.soldQuantity,
+        r.soldAmount,
+        r.freeSchemeQuantity,
+        r.freeSchemeValue,
+        r.sampled,
+        r.damaged,
+        r.expectedClosing,
+        r.actualClosing ?? '—',
+        r.mismatch ?? '—',
+      ]),
+    });
+
+    return pdfToBuffer(doc);
+  }
+
+  async weeklyPdf(tenant: TenantContext, from?: string, to?: string): Promise<Buffer> {
+    const [report, name] = await Promise.all([this.weekly(tenant, from, to), this.campaignName(tenant)]);
+    const doc = newReportDoc();
+    const period = from || to ? `${from ?? '…'} to ${to ?? '…'}` : 'All time';
+
+    this.reportHeader(doc, 'Weekly Report — Trends', name, period);
+    drawTable(doc, {
+      headers: ['Date', 'Outlets Visited', 'Units Sold', 'Sales Amount'],
+      widths: [100, 120, 120, 120],
+      rows: report.trends.map((t) => [t.date, t.outletsVisited, t.unitsSold, t.salesAmount]),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — Target vs Achievement', name, period);
+    drawTable(doc, {
+      headers: ['KPI', 'Target', 'Actual', 'Achievement %'],
+      widths: [150, 100, 100, 100],
+      rows: report.kpiAchievement.map((k) => [k.label, k.targetValue, k.actualValue, k.achievementPercent ?? '—']),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — State Comparison', name, period);
+    drawTable(doc, {
+      headers: ['State', 'Planned Stops', 'Completed Stops', 'Completion %'],
+      widths: [150, 120, 120, 120],
+      rows: report.stateComparison.map((s) => [s.state, s.plannedStops, s.completedStops, s.completionRate]),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — Team Performance', name, period);
+    drawTable(doc, {
+      headers: ['User', 'Assigned', 'In Progress', 'Completed', 'Cancelled', 'Completion %'],
+      widths: [150, 90, 90, 90, 90, 90],
+      rows: report.teamPerformance.map((p) => [p.fullName, p.assigned, p.inProgress, p.completed, p.cancelled, p.completionRate]),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — Data Quality', name, period);
+    drawTable(doc, {
+      headers: ['Metric', 'Value'],
+      widths: [300, 120],
+      rows: [
+        ['Completed stops', report.dataQuality.completedStops],
+        ['Stops with no photo evidence', report.dataQuality.stopsWithNoPhotoEvidence],
+        ['Stops with form submitted 24h+ late', report.dataQuality.stopsWithFormSubmittedOver24hLate],
+      ],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — Recurring Exceptions', name, period);
+    drawTable(doc, { headers: ['Category', 'Count'], widths: [250, 100], rows: report.recurringExceptions.map((e) => [e.category, e.count]) });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Weekly Report — Corrective Actions', name, period);
+    drawTable(doc, {
+      headers: ['Category', 'Severity', 'Resolution', 'Resolved At'],
+      widths: [150, 80, 350, 100],
+      rows: report.correctiveActions.map((c) => [c.category, c.severity, c.resolution ?? '', this.fmtDate(c.resolvedAt)]),
+    });
+
+    return pdfToBuffer(doc);
+  }
+
+  async closurePdf(tenant: TenantContext): Promise<Buffer> {
+    const [report, name] = await Promise.all([this.closure(tenant), this.campaignName(tenant)]);
+    const doc = newReportDoc();
+
+    this.reportHeader(doc, 'Campaign Closure Report', name, 'Full campaign lifetime');
+    drawTable(doc, {
+      headers: ['Field', 'Value'],
+      widths: [200, 300],
+      rows: [
+        ['Client', report.overview?.clientName ?? '—'],
+        ['Status', report.overview?.status ?? '—'],
+        ['Start date', this.fmtDate(report.overview?.startDate)],
+        ['End date', this.fmtDate(report.overview?.endDate)],
+      ],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Geography Covered', name);
+    drawTable(doc, {
+      headers: ['States', 'Districts', 'Tehsils', 'Locations'],
+      widths: [120, 120, 120, 120],
+      rows: [[report.geography.states, report.geography.districts, report.geography.tehsils, report.geography.locations]],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Planned vs Executed', name);
+    drawTable(doc, {
+      headers: ['Planned Stops', 'Completed Stops', 'Cancelled Stops', 'Completion %'],
+      widths: [120, 120, 120, 120],
+      rows: [[report.plannedVsExecuted.plannedStops, report.plannedVsExecuted.completedStops, report.plannedVsExecuted.cancelledStops, report.plannedVsExecuted.completionRate]],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'KPI Achievement', name);
+    drawTable(doc, {
+      headers: ['KPI', 'Target', 'Actual', 'Achievement %'],
+      widths: [150, 100, 100, 100],
+      rows: report.kpiAchievement.map((k) => [k.label, k.targetValue, k.actualValue, k.achievementPercent ?? '—']),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Sales & Trials', name);
+    drawTable(doc, {
+      headers: ['Metric', 'Value'],
+      widths: [300, 150],
+      rows: [
+        ['Total units sold', report.sales.totalUnitsSold],
+        ['Total sales amount', report.sales.totalSalesAmount],
+        ['Total units sampled (trials)', report.trials.totalUnitsSampled],
+      ],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Leads', name);
+    drawTable(doc, {
+      headers: ['Status', 'Count'],
+      widths: [200, 100],
+      rows: [...report.leads.byStatus.map((l) => [l.status, l.count]), ['Total', report.leads.total]],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Activity Completion', name, 'No single "installations" concept exists across every campaign type — shown here as completion by activity type instead.');
+    drawTable(doc, {
+      headers: ['Activity Type', 'Planned', 'Completed'],
+      widths: [250, 120, 120],
+      rows: report.activityCompletion.map((a) => [a.activityTypeName, a.planned, a.completed]),
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Evidence', name);
+    drawTable(doc, {
+      headers: ['Metric', 'Value'],
+      widths: [250, 120],
+      rows: [
+        ['Total media', report.evidence.totalMediaCount],
+        ['Photos', report.evidence.photoCount],
+        ['Videos', report.evidence.videoCount],
+        ['Signatures', report.evidence.signatureCount],
+      ],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Route Compliance', name);
+    drawTable(doc, {
+      headers: ['Total Deviation Requests', 'Approved', 'Rejected', 'Pending', 'Avg Distance (m)'],
+      widths: [150, 100, 100, 100, 130],
+      rows: [[
+        report.routeCompliance.totalDeviationRequests,
+        report.routeCompliance.approved,
+        report.routeCompliance.rejected,
+        report.routeCompliance.pending,
+        report.routeCompliance.averageDistanceMeters ?? '—',
+      ]],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Operational Issues', name);
+    drawTable(doc, {
+      headers: ['Category', 'Count'],
+      widths: [250, 100],
+      rows: [...report.operationalIssues.byCategory.map((i) => [i.category, i.count]), ['Total', report.operationalIssues.totalExceptions]],
+    });
+
+    doc.addPage();
+    this.reportHeader(doc, 'Learnings & Recommendations', name);
+    doc.font('Helvetica-Oblique').fontSize(10).text('This section is intentionally left blank for your team to fill in by hand.');
+    doc.moveDown().font('Helvetica-Bold').fontSize(11).text('Learnings:');
+    doc.moveDown(3);
+    doc.font('Helvetica-Bold').fontSize(11).text('Recommendations:');
+    doc.moveDown(3);
+
+    return pdfToBuffer(doc);
+  }
+
+  async closurePpt(tenant: TenantContext): Promise<Buffer> {
+    const [report, name] = await Promise.all([this.closure(tenant), this.campaignName(tenant)]);
+    const pres = new PptxGenJS();
+    pres.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
+    pres.layout = 'WIDE';
+
+    const titleSlide = pres.addSlide();
+    titleSlide.addText('Campaign Closure Report', { x: 0.5, y: 2.5, w: 12, h: 1, fontSize: 36, bold: true });
+    titleSlide.addText(name, { x: 0.5, y: 3.6, w: 12, h: 0.6, fontSize: 20 });
+    titleSlide.addText(report.overview?.clientName ?? '', { x: 0.5, y: 4.2, w: 12, h: 0.5, fontSize: 16, color: '666666' });
+
+    const addTableSlide = (title: string, headerRow: string[], rows: (string | number)[][], note?: string) => {
+      const slide = pres.addSlide();
+      slide.addText(title, { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 24, bold: true });
+      if (note) slide.addText(note, { x: 0.5, y: 0.95, w: 12, h: 0.4, fontSize: 11, italic: true, color: '666666' });
+      const tableRows = [headerRow.map((h) => ({ text: h, options: { bold: true } })), ...rows.map((r) => r.map((c) => ({ text: String(c) })))];
+      slide.addTable(tableRows, { x: 0.5, y: note ? 1.5 : 1.2, w: 12, fontSize: 12, autoPage: true });
+    };
+
+    addTableSlide('Overview', ['Field', 'Value'], [
+      ['Status', report.overview?.status ?? '—'],
+      ['Start date', this.fmtDate(report.overview?.startDate)],
+      ['End date', this.fmtDate(report.overview?.endDate)],
+    ]);
+    addTableSlide('Geography Covered', ['States', 'Districts', 'Tehsils', 'Locations'], [
+      [report.geography.states, report.geography.districts, report.geography.tehsils, report.geography.locations],
+    ]);
+    addTableSlide('Planned vs Executed', ['Planned Stops', 'Completed Stops', 'Cancelled Stops', 'Completion %'], [
+      [report.plannedVsExecuted.plannedStops, report.plannedVsExecuted.completedStops, report.plannedVsExecuted.cancelledStops, report.plannedVsExecuted.completionRate],
+    ]);
+    addTableSlide('KPI Achievement', ['KPI', 'Target', 'Actual', 'Achievement %'],
+      report.kpiAchievement.map((k) => [k.label, k.targetValue, k.actualValue, k.achievementPercent ?? '—']));
+    addTableSlide('Sales & Trials', ['Metric', 'Value'], [
+      ['Total units sold', report.sales.totalUnitsSold],
+      ['Total sales amount', report.sales.totalSalesAmount],
+      ['Total units sampled (trials)', report.trials.totalUnitsSampled],
+    ]);
+    addTableSlide('Leads', ['Status', 'Count'], [...report.leads.byStatus.map((l) => [l.status, l.count]), ['Total', report.leads.total]]);
+    addTableSlide(
+      'Activity Completion',
+      ['Activity Type', 'Planned', 'Completed'],
+      report.activityCompletion.map((a) => [a.activityTypeName, a.planned, a.completed]),
+      'No single "installations" concept exists across every campaign type — shown here as completion by activity type instead.',
+    );
+    addTableSlide('Evidence', ['Metric', 'Value'], [
+      ['Total media', report.evidence.totalMediaCount],
+      ['Photos', report.evidence.photoCount],
+      ['Videos', report.evidence.videoCount],
+      ['Signatures', report.evidence.signatureCount],
+    ]);
+    addTableSlide('Route Compliance', ['Total Deviation Requests', 'Approved', 'Rejected', 'Pending', 'Avg Distance (m)'], [[
+      report.routeCompliance.totalDeviationRequests,
+      report.routeCompliance.approved,
+      report.routeCompliance.rejected,
+      report.routeCompliance.pending,
+      report.routeCompliance.averageDistanceMeters ?? '—',
+    ]]);
+    addTableSlide('Operational Issues', ['Category', 'Count'], [
+      ...report.operationalIssues.byCategory.map((i) => [i.category, i.count]),
+      ['Total', report.operationalIssues.totalExceptions],
+    ]);
+
+    const learningsSlide = pres.addSlide();
+    learningsSlide.addText('Learnings & Recommendations', { x: 0.5, y: 0.3, w: 12, h: 0.7, fontSize: 24, bold: true });
+    learningsSlide.addText('This slide is intentionally left blank for your team to fill in by hand.', {
+      x: 0.5, y: 1.2, w: 12, h: 0.5, fontSize: 12, italic: true, color: '666666',
+    });
+    learningsSlide.addText('Learnings:\n\n\nRecommendations:\n\n', { x: 0.5, y: 1.9, w: 12, h: 4, fontSize: 14 });
+
+    return (await pres.write({ outputType: 'nodebuffer' })) as Buffer;
   }
 }

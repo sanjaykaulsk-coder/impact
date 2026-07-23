@@ -34,26 +34,41 @@ export default function ReportsPage() {
   const [closure, setClosure] = useState<ClosureReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<'xlsx' | 'pdf' | 'pptx' | null>(null);
 
   const activeCampaign = campaigns.find((c) => c.campaignId === selectedCampaignId);
 
-  const downloadExcel = useCallback(() => {
-    if (!selectedCampaignId) return;
-    setError(null);
-    setDownloading(true);
-    const request =
-      tab === 'DFR'
-        ? api.reports.downloadDfrExcel(selectedCampaignId, from || undefined, to || undefined)
-        : tab === 'STOCK'
-          ? api.reports.downloadStockReconciliationExcel(selectedCampaignId, from || undefined, to || undefined)
-          : tab === 'WEEKLY'
-            ? api.reports.downloadWeeklyExcel(selectedCampaignId, from || undefined, to || undefined)
-            : api.reports.downloadClosureExcel(selectedCampaignId);
-    request
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not download report'))
-      .finally(() => setDownloading(false));
-  }, [selectedCampaignId, tab, from, to]);
+  const download = useCallback(
+    (format: 'xlsx' | 'pdf' | 'pptx') => {
+      if (!selectedCampaignId) return;
+      setError(null);
+      setDownloadingFormat(format);
+      const f = from || undefined;
+      const t = to || undefined;
+      const request =
+        format === 'pptx'
+          ? api.reports.downloadClosurePpt(selectedCampaignId)
+          : tab === 'DFR'
+            ? format === 'xlsx'
+              ? api.reports.downloadDfrExcel(selectedCampaignId, f, t)
+              : api.reports.downloadDfrPdf(selectedCampaignId, f, t)
+            : tab === 'STOCK'
+              ? format === 'xlsx'
+                ? api.reports.downloadStockReconciliationExcel(selectedCampaignId, f, t)
+                : api.reports.downloadStockReconciliationPdf(selectedCampaignId, f, t)
+              : tab === 'WEEKLY'
+                ? format === 'xlsx'
+                  ? api.reports.downloadWeeklyExcel(selectedCampaignId, f, t)
+                  : api.reports.downloadWeeklyPdf(selectedCampaignId, f, t)
+                : format === 'xlsx'
+                  ? api.reports.downloadClosureExcel(selectedCampaignId)
+                  : api.reports.downloadClosurePdf(selectedCampaignId);
+      request
+        .catch((err) => setError(err instanceof Error ? err.message : 'Could not download report'))
+        .finally(() => setDownloadingFormat(null));
+    },
+    [selectedCampaignId, tab, from, to],
+  );
 
   const load = useCallback(() => {
     if (!selectedCampaignId) return;
@@ -113,10 +128,18 @@ export default function ReportsPage() {
               </div>
             </>
           )}
-          <div className="field" style={{ alignSelf: 'flex-end' }}>
-            <button className="btn-secondary" onClick={downloadExcel} disabled={downloading || !selectedCampaignId}>
-              {downloading ? 'Preparing…' : 'Download Excel'}
+          <div className="field" style={{ alignSelf: 'flex-end', display: 'flex', gap: 8 }}>
+            <button className="btn-secondary" onClick={() => download('xlsx')} disabled={downloadingFormat !== null || !selectedCampaignId}>
+              {downloadingFormat === 'xlsx' ? 'Preparing…' : 'Download Excel'}
             </button>
+            <button className="btn-secondary" onClick={() => download('pdf')} disabled={downloadingFormat !== null || !selectedCampaignId}>
+              {downloadingFormat === 'pdf' ? 'Preparing…' : 'Download PDF'}
+            </button>
+            {tab === 'CLOSURE' && (
+              <button className="btn-secondary" onClick={() => download('pptx')} disabled={downloadingFormat !== null || !selectedCampaignId}>
+                {downloadingFormat === 'pptx' ? 'Preparing…' : 'Download PowerPoint'}
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -344,6 +344,31 @@ export const api = {
     closure: (campaignId: string) => request<ClosureReportResponse>(`/campaigns/${campaignId}/reports/closure`),
     downloadClosureExcel: (campaignId: string) =>
       downloadFile(`/campaigns/${campaignId}/reports/closure.xlsx`, 'Campaign-Closure-Report.xlsx'),
+    downloadDfrPdf: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(`/campaigns/${campaignId}/reports/dfr.pdf${qs ? `?${qs}` : ''}`, 'DFR.pdf');
+    },
+    downloadStockReconciliationPdf: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(`/campaigns/${campaignId}/reports/stock-reconciliation.pdf${qs ? `?${qs}` : ''}`, 'Stock-Reconciliation.pdf');
+    },
+    downloadWeeklyPdf: (campaignId: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return downloadFile(`/campaigns/${campaignId}/reports/weekly.pdf${qs ? `?${qs}` : ''}`, 'Weekly-Report.pdf');
+    },
+    downloadClosurePdf: (campaignId: string) =>
+      downloadFile(`/campaigns/${campaignId}/reports/closure.pdf`, 'Campaign-Closure-Report.pdf'),
+    downloadClosurePpt: (campaignId: string) =>
+      downloadFile(`/campaigns/${campaignId}/reports/closure.pptx`, 'Campaign-Closure-Report.pptx'),
   },
   targets: {
     list: (campaignId: string) => request<TargetResponse[]>(`/campaigns/${campaignId}/targets`),

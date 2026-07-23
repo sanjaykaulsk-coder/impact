@@ -6,6 +6,8 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { ReportsService } from './reports.service';
 
 const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const PDF_CONTENT_TYPE = 'application/pdf';
+const PPTX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
 @Controller('campaigns/:campaignId/reports')
 @UseGuards(CampaignScopeGuard)
@@ -93,5 +95,55 @@ export class ReportsController {
   async closureExcel(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
     const buffer = await this.reports.closureWorkbook(tenant);
     return new StreamableFile(buffer);
+  }
+
+  @Get('dfr.pdf')
+  @Header('Content-Type', PDF_CONTENT_TYPE)
+  @Header('Content-Disposition', 'attachment; filename="DFR.pdf"')
+  async dfrPdf(
+    @Param('campaignId') _campaignId: string,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return new StreamableFile(await this.reports.dfrPdf(tenant, from, to));
+  }
+
+  @Get('stock-reconciliation.pdf')
+  @Header('Content-Type', PDF_CONTENT_TYPE)
+  @Header('Content-Disposition', 'attachment; filename="Stock-Reconciliation.pdf"')
+  async stockReconciliationPdf(
+    @Param('campaignId') _campaignId: string,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return new StreamableFile(await this.reports.stockReconciliationPdf(tenant, from, to));
+  }
+
+  @Get('weekly.pdf')
+  @Header('Content-Type', PDF_CONTENT_TYPE)
+  @Header('Content-Disposition', 'attachment; filename="Weekly-Report.pdf"')
+  async weeklyPdf(
+    @Param('campaignId') _campaignId: string,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return new StreamableFile(await this.reports.weeklyPdf(tenant, from, to));
+  }
+
+  @Get('closure.pdf')
+  @Header('Content-Type', PDF_CONTENT_TYPE)
+  @Header('Content-Disposition', 'attachment; filename="Campaign-Closure-Report.pdf"')
+  async closurePdf(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
+    return new StreamableFile(await this.reports.closurePdf(tenant));
+  }
+
+  @Get('closure.pptx')
+  @Header('Content-Type', PPTX_CONTENT_TYPE)
+  @Header('Content-Disposition', 'attachment; filename="Campaign-Closure-Report.pptx"')
+  async closurePpt(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
+    return new StreamableFile(await this.reports.closurePpt(tenant));
   }
 }
