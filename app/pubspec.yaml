@@ -43,6 +43,9 @@ dependencies:
   # only speaks to Google's own hosted tile service and has no offline-corridor story at all.
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  # "External navigation apps may be opened when available" (spec §20) — same
+  # https://maps.google.com/?q=lat,lng pattern the web Live Map page already uses for supervisors.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
