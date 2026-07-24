@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/api/api_client.dart';
@@ -10,10 +10,33 @@ class MapCorridorRepository {
   final ApiClient api;
   MapCorridorRepository({required this.api});
 
+  Future<File> _manifestCacheFile(String campaignId, String userId) async {
+    final dir = await _tileCacheDir();
+    return File('${dir.path}/corridor_${campaignId}_$userId.json');
+  }
+
+  /// Tries the network first (so a field worker who re-opens this mid-morning with signal gets
+  /// today's freshest assignment list), falling back to whatever manifest was cached from the
+  /// last successful fetch if the network call fails. Caught live, on a real running emulator,
+  /// testing with network deliberately disabled: without this fallback, the screen failed outright
+  /// on a second, offline open — even though every tile it needed was already sitting on disk —
+  /// because only the tile *images* were being cached, not the manifest (locations + which tiles
+  /// belong to today's corridor) that tells the map what to draw. That's the actual point of
+  /// "offline map corridors" (spec §20): sync once with signal, then no network needed at all.
   Future<MapCorridorResponse> getCorridor(String campaignId, String userId, {String? date}) async {
-    final qs = date != null ? '?date=$date' : '';
-    final json = await api.get('/campaigns/$campaignId/map-corridor/$userId$qs');
-    return MapCorridorResponse.fromJson(json as Map<String, dynamic>);
+    final cacheFile = await _manifestCacheFile(campaignId, userId);
+    try {
+      final qs = date != null ? '?date=$date' : '';
+      final json = await api.get('/campaigns/$campaignId/map-corridor/$userId$qs');
+      await cacheFile.writeAsString(jsonEncode(json));
+      return MapCorridorResponse.fromJson(json as Map<String, dynamic>);
+    } catch (e) {
+      if (await cacheFile.exists()) {
+        final cached = jsonDecode(await cacheFile.readAsString()) as Map<String, dynamic>;
+        return MapCorridorResponse.fromJson(cached);
+      }
+      rethrow;
+    }
   }
 
   Future<Directory> _tileCacheDir() async {
@@ -38,10 +61,8 @@ class MapCorridorRepository {
       final file = File('${dir.path}/${tile.z}_${tile.x}_${tile.y}.png');
       if (!await file.exists()) {
         try {
-          final res = await http.get(Uri.parse(tile.url));
-          if (res.statusCode == 200) {
-            await file.writeAsBytes(res.bodyBytes);
-          }
+          final bytes = await api.getBytes(tile.path);
+          await file.writeAsBytes(bytes);
         } catch (_) {
           // Best-effort, see doc comment above.
         }

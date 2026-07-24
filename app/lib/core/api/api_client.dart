@@ -138,6 +138,18 @@ class ApiClient {
       _request('POST', path, body: body, auth: false);
   Future<dynamic> post(String path, Map<String, dynamic> body) => _request('POST', path, body: body);
 
+  /// A raw-bytes GET (map tiles, so far) — same host resolution and bearer-token auth as every
+  /// JSON call, just skipping the JSON decode step.
+  Future<List<int>> getBytes(String path) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = <String, String>{};
+    final token = await tokenStore.accessToken;
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    final res = await _http.get(uri, headers: headers).timeout(_requestTimeout);
+    if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
+    throw ApiException(res.statusCode, 'Request failed (${res.statusCode})');
+  }
+
   /// Multipart upload — used only for camera evidence photos. Field values are sent as form
   /// fields alongside the file, matching the backend's UploadMediaDto (multer + class-transformer
   /// coerce everything from strings, same as any HTML multipart form).

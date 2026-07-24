@@ -69,10 +69,12 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() {
-        _error = '$e';
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
+      }
     }
   }
 

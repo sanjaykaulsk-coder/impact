@@ -57,8 +57,22 @@ export class MapTileService implements OnModuleInit {
     await this.client.putObject(this.bucket, key, buffer, buffer.length, { 'Content-Type': 'image/png' });
   }
 
-  async getSignedTileUrl(z: number, x: number, y: number): Promise<string> {
-    const ttlSeconds = Number(process.env.MINIO_SIGNED_URL_TTL_SECONDS ?? '900');
-    return this.client.presignedGetObject(this.bucket, this.tileKey(z, x, y), ttlSeconds);
+  /**
+   * Raw tile bytes, read straight from MinIO. Deliberately NOT a signed URL the phone fetches
+   * directly (that was this feature's first, real bug — a signed URL bakes in `MINIO_ENDPOINT`,
+   * which is `localhost` from the backend's own point of view but unreachable as `localhost` from
+   * a phone or emulator, exactly the same class of problem `api_client.dart` already documents for
+   * the API host itself). Every other client/server exchange in this app goes through the one API
+   * host the app already resolves correctly for both emulator and physical-device testing — tiles
+   * now do too, proxied through this same channel instead of introducing a second host to resolve.
+   */
+  async getTileBuffer(z: number, x: number, y: number): Promise<Buffer> {
+    const key = this.tileKey(z, x, y);
+    const stream = await this.client.getObject(this.bucket, key);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk as Buffer);
+    }
+    return Buffer.concat(chunks);
   }
 }

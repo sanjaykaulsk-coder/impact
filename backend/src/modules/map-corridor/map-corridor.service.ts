@@ -91,9 +91,15 @@ export class MapCorridorService {
       await Promise.all(batch.map((t) => this.mapTiles.ensureTileCached(t.z, t.x, t.y)));
     }
 
-    const tiles = await Promise.all(
-      tileRefs.map(async (t) => ({ z: t.z, x: t.x, y: t.y, url: await this.mapTiles.getSignedTileUrl(t.z, t.x, t.y) })),
-    );
+    // A relative API path, not a signed MinIO URL — see MapTileService.getTileBuffer()'s doc
+    // comment for why: the phone already resolves this app's one API host correctly for both
+    // emulator and physical-device testing, and this reuses that instead of a second host.
+    const tiles = tileRefs.map((t) => ({
+      z: t.z,
+      x: t.x,
+      y: t.y,
+      path: `/campaigns/${tenant.campaignId}/map-corridor/tile/${t.z}/${t.x}/${t.y}.png`,
+    }));
 
     return { locations, tiles, tileCount: tiles.length };
   }

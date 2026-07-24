@@ -29,15 +29,19 @@ class MapCorridorTile {
   final int z;
   final int x;
   final int y;
-  final String url;
+  // A path relative to the app's own API base URL, not an absolute URL — proxied through the
+  // backend rather than a signed MinIO link, so the same host resolution that already works for
+  // every other API call (emulator's 10.0.2.2, or a physical device's configured LAN address)
+  // applies here too.
+  final String path;
 
-  MapCorridorTile({required this.z, required this.x, required this.y, required this.url});
+  MapCorridorTile({required this.z, required this.x, required this.y, required this.path});
 
   factory MapCorridorTile.fromJson(Map<String, dynamic> json) => MapCorridorTile(
         z: json['z'] as int,
         x: json['x'] as int,
         y: json['y'] as int,
-        url: json['url'] as String,
+        path: json['path'] as String,
       );
 }
 
