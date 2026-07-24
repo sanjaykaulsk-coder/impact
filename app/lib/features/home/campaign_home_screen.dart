@@ -178,6 +178,15 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('View Route Map'),
+                  onPressed: () => context.push(
+                    '/route-map',
+                    extra: {'campaignId': campaignId, 'userId': state.user!.id},
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text('Today\'s assignments', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 FutureBuilder<List<MyAssignment>>(

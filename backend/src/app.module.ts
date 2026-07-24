@@ -19,6 +19,7 @@ import { ExceptionsModule } from './modules/exceptions/exceptions.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { HealthModule } from './modules/health/health.module';
+import { MapCorridorModule } from './modules/map-corridor/map-corridor.module';
 import { PjpModule } from './modules/pjp/pjp.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SkusModule } from './modules/skus/skus.module';
@@ -48,6 +49,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     ExecutionModule,
     FormsModule,
     HealthModule,
+    MapCorridorModule,
     PjpModule,
     ReportsModule,
     SkusModule,

@@ -38,6 +38,12 @@ dependencies:
   uuid: ^4.5.1
   crypto: ^3.0.6
 
+  # Offline map corridors (spec §20, Post-MVP backlog): flutter_map renders OpenStreetMap tiles
+  # from any TileProvider, including a custom on-disk cache — unlike google_maps_flutter, which
+  # only speaks to Google's own hosted tile service and has no offline-corridor story at all.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
