@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import 'auth_controller.dart';
 
 /// The explicit "device check" step of the login flow (spec §7/§15). By the time this screen
@@ -36,16 +37,16 @@ class _DeviceCheckScreenState extends ConsumerState<DeviceCheckScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.verified_user_outlined, size: 40, color: Color(0xFF1B5E3C)),
-            SizedBox(height: 16),
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Device verified. Loading your campaigns…'),
+            const Icon(Icons.verified_user_outlined, size: 40, color: Color(0xFF1B5E3C)),
+            const SizedBox(height: 16),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(AppLocalizations.of(context)!.deviceVerifiedLoading),
           ],
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/location/get_current_position.dart';
 import '../../core/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'map_corridor_models.dart';
 import 'map_corridor_repository.dart';
 import 'offline_file_tile_provider.dart';
@@ -41,7 +42,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   String? _tileCachePath;
   String? _error;
   bool _loading = true;
-  String _status = 'Loading your route…';
+  (int done, int total)? _downloadProgress;
   LatLng? _currentPosition;
 
   @override
@@ -57,11 +58,11 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
       final cachePath = await repo.tileCachePath();
 
       if (corridor.tiles.isNotEmpty) {
-        if (mounted) setState(() => _status = 'Downloading map (0/${corridor.tiles.length})…');
+        if (mounted) setState(() => _downloadProgress = (0, corridor.tiles.length));
         await repo.prefetchTiles(
           corridor.tiles,
           onProgress: (done, total) {
-            if (mounted) setState(() => _status = 'Downloading map ($done/$total)…');
+            if (mounted) setState(() => _downloadProgress = (done, total));
           },
         );
       }
@@ -121,6 +122,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
 
   void _showLocationDetails(MapCorridorLocation loc) {
     final distance = _distanceMetersTo(loc);
+    final t = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       builder: (context) => Padding(
@@ -131,19 +133,19 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           children: [
             Text(loc.locationName, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Status: ${loc.status}'),
+            Text(t.statusLine(loc.status)),
             const SizedBox(height: 4),
-            Text(distance != null ? 'Distance from you: ${_formatDistance(distance)}' : 'Turn on location to see distance'),
+            Text(distance != null ? t.distanceFromYou(_formatDistance(distance)) : t.turnOnLocationForDistance),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               icon: const Icon(Icons.directions),
-              label: const Text('Open in Google Maps'),
+              label: Text(t.openInGoogleMaps),
               onPressed: () async {
                 final uri = _googleMapsUri(loc.latitude, loc.longitude);
                 final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
                 if (!opened && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not open Google Maps — check you have signal and a maps app installed.')),
+                    SnackBar(content: Text(t.couldNotOpenGoogleMaps)),
                   );
                 }
               },
@@ -157,20 +159,22 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Route Map')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.routeMapTitle)),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final t = AppLocalizations.of(context)!;
     if (_loading) {
+      final progress = _downloadProgress;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 12),
-            Text(_status),
+            Text(progress == null ? t.loadingYourRoute : t.downloadingMap('${progress.$1}', '${progress.$2}')),
           ],
         ),
       );
@@ -179,16 +183,16 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('Could not load your route map: $_error'),
+          child: Text(t.couldNotLoadRouteMap('$_error')),
         ),
       );
     }
     final corridor = _corridor;
     if (corridor == null || corridor.locations.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('No assigned stops with a map location for today.'),
+          padding: const EdgeInsets.all(24),
+          child: Text(t.noAssignedStopsToday),
         ),
       );
     }
@@ -205,10 +209,10 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: Text(
             nextStop == null
-                ? 'All stops completed for today.'
+                ? t.allStopsCompletedToday
                 : _currentPosition == null
-                    ? 'Distance to next stop (${nextStop.locationName}): turn on location to see this'
-                    : 'Distance to next stop (${nextStop.locationName}): ${_formatDistance(nextStopDistance!)}',
+                    ? t.distanceToNextStopUnknown(nextStop.locationName)
+                    : t.distanceToNextStop(nextStop.locationName, _formatDistance(nextStopDistance!)),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),

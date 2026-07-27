@@ -1,7 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CampaignsService } from './campaigns.service';
+import { UpdatePreferredLanguageDto } from './dto/update-preferred-language.dto';
 
 @Controller('me')
 export class MeController {
@@ -27,6 +28,26 @@ export class MeController {
           : null,
         lastLoginAt: record.lastLoginAt,
       };
+    });
+  }
+
+  /**
+   * Regional languages (Post-MVP backlog): the field app's language switcher is a self-service
+   * preference change, not an admin action — hard-filtered to the caller's own id, same safe-bypass
+   * reasoning as getProfile above.
+   */
+  @Patch('preferred-language')
+  async updatePreferredLanguage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdatePreferredLanguageDto,
+  ) {
+    return this.prisma.runWithBypass(async (tx) => {
+      const record = await tx.user.update({
+        where: { id: user.id },
+        data: { preferredLanguage: dto.preferredLanguage },
+        select: { id: true, preferredLanguage: true },
+      });
+      return record;
     });
   }
 

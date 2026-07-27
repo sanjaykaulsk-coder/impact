@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/locale/language_toggle.dart';
+import '../../l10n/app_localizations.dart';
 import 'auth_controller.dart';
 
 class MobileEntryScreen extends ConsumerStatefulWidget {
@@ -47,6 +49,7 @@ class _MobileEntryScreenState extends ConsumerState<MobileEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -60,14 +63,20 @@ class _MobileEntryScreenState extends ConsumerState<MobileEntryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset('assets/brand/logo.png', height: 48, semanticLabel: ''),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Image.asset('assets/brand/logo.png', height: 48, semanticLabel: ''),
+                        const LanguageToggle(),
+                      ],
+                    ),
                     const SizedBox(height: 14),
-                    const Text(
-                      'Impact Field Command',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    Text(
+                      t.appTitle,
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
-                    Text('Field application', style: TextStyle(color: Colors.grey.shade600)),
+                    Text(t.fieldApplicationTagline, style: TextStyle(color: Colors.grey.shade600)),
                     const SizedBox(height: 28),
                     if (_error != null) ...[
                       Container(
@@ -84,14 +93,14 @@ class _MobileEntryScreenState extends ConsumerState<MobileEntryScreen> {
                       controller: _mobileController,
                       keyboardType: TextInputType.phone,
                       maxLength: 10,
-                      decoration: const InputDecoration(
-                        labelText: 'Mobile number',
-                        hintText: '10-digit mobile number',
+                      decoration: InputDecoration(
+                        labelText: t.mobileNumberLabel,
+                        hintText: t.mobileNumberHint,
                         counterText: '',
                       ),
                       validator: (value) {
                         if (value == null || !RegExp(r'^[6-9]\d{9}$').hasMatch(value)) {
-                          return 'Enter a valid 10-digit mobile number';
+                          return t.mobileNumberValidationError;
                         }
                         return null;
                       },
@@ -101,7 +110,7 @@ class _MobileEntryScreenState extends ConsumerState<MobileEntryScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _busy ? null : _submit,
-                        child: Text(_busy ? 'Sending OTP…' : 'Send OTP'),
+                        child: Text(_busy ? t.sendingOtp : t.sendOtp),
                       ),
                     ),
                   ],

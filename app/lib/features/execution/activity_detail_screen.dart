@@ -8,6 +8,7 @@ import '../../core/api/api_client.dart';
 import '../../core/location/get_current_position.dart';
 import '../../core/offline/outbox_database.dart';
 import '../../core/providers.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import 'execution_models.dart';
 
@@ -20,18 +21,18 @@ import 'execution_models.dart';
 const _gpsCaptureInterval = Duration(seconds: 45);
 const _gpsBatchSize = 3;
 
-const Map<String, String> _deviationTypeLabels = {
-  'OUTSIDE_PERMITTED_RADIUS': 'Outside permitted radius',
-  'UNPLANNED_LOCATION': 'Unplanned location',
-  'SKIPPED_LOCATION': 'Skipped location',
-  'WRONG_SEQUENCE': 'Wrong sequence',
-  'LATE_ARRIVAL': 'Late arrival',
-  'EARLY_DEPARTURE': 'Early departure',
-  'UNPLANNED_STOPPAGE': 'Unplanned stoppage',
-  'GPS_DISABLED': 'GPS disabled/unavailable',
-  'ABNORMAL_SPEED': 'Abnormal speed',
-  'SUSPECTED_LOCATION_MANIPULATION': 'Suspected location manipulation',
-};
+Map<String, String> _deviationTypeLabels(AppLocalizations t) => {
+      'OUTSIDE_PERMITTED_RADIUS': t.deviationOutsideRadius,
+      'UNPLANNED_LOCATION': t.deviationUnplanned,
+      'SKIPPED_LOCATION': t.deviationSkipped,
+      'WRONG_SEQUENCE': t.deviationWrongSequence,
+      'LATE_ARRIVAL': t.deviationLateArrival,
+      'EARLY_DEPARTURE': t.deviationEarlyDeparture,
+      'UNPLANNED_STOPPAGE': t.deviationUnplannedStoppage,
+      'GPS_DISABLED': t.deviationGpsDisabled,
+      'ABNORMAL_SPEED': t.deviationAbnormalSpeed,
+      'SUSPECTED_LOCATION_MANIPULATION': t.deviationSuspectedManipulation,
+    };
 
 class ActivityDetailScreen extends ConsumerStatefulWidget {
   final String assignmentId;
@@ -114,6 +115,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   void _openDeviationDialog({String? prefilledType, double? distanceMeters}) {
     if (_bundle == null) return;
+    final t = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (_) => _DeviationDialog(
@@ -131,7 +133,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           if (mounted) {
             setState(() => _flaggedPoint = null);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sent to your supervisor for review.')),
+              SnackBar(content: Text(t.sentToSupervisor)),
             );
           }
         },
@@ -163,7 +165,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         setState(() => _error = e is ApiException ? e.message : e.toString());
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not refresh from the server — showing what\'s saved on this device.')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.couldNotRefresh)),
         );
       }
     } finally {
@@ -198,7 +200,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       await _syncNow();
       _startGpsTrackingIfNeeded(true, false);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Check-in failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.checkInFailed('$e'))));
+      }
     } finally {
       if (mounted) setState(() => _actionInProgress = false);
     }
@@ -221,7 +225,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       _stopGpsTracking();
       await _syncNow();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Check-out failed: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.checkOutFailed('$e'))));
+      }
     } finally {
       if (mounted) setState(() => _actionInProgress = false);
     }
@@ -240,7 +246,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           );
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not update checklist: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.couldNotUpdateChecklist('$e'))),
+        );
+      }
     } finally {
       if (mounted) setState(() => _actionInProgress = false);
     }
@@ -255,7 +265,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       await ref.read(executionRepositoryProvider).resubmit(_campaignId, _bundle!.activity.id);
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not resubmit: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.couldNotResubmit('$e'))));
+      }
     } finally {
       if (mounted) setState(() => _actionInProgress = false);
     }
@@ -268,22 +280,20 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     return null;
   }
 
-  String _flaggedPointMessage(GpsPointResult point) {
+  String _flaggedPointMessage(AppLocalizations t, GpsPointResult point) {
     if (!point.withinTolerance) {
       final d = point.distanceFromPlannedMeters;
-      return d != null
-          ? 'You appear to be about ${d.round()}m from the planned location — explain why?'
-          : 'You appear to be away from the planned location — explain why?';
+      return d != null ? t.distanceFromPlanned('${d.round()}') : t.awayFromPlanned;
     }
-    if (point.suspectedManipulation) return 'An unusual location jump was detected — explain why?';
-    if (point.abnormalSpeed) return 'An unusually high speed was detected — explain why?';
-    return 'Something about this visit looked unusual — explain why?';
+    if (point.suspectedManipulation) return t.unusualLocationJump;
+    if (point.abnormalSpeed) return t.unusualSpeed;
+    return t.somethingUnusual;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Activity')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.activityTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -293,6 +303,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
   }
 
   Widget _buildBody(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final bundle = _bundle!;
     final milestone = bundle.milestone;
     final outboxDb = ref.watch(outboxDatabaseProvider);
@@ -328,9 +339,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(milestone?.name ?? 'Field activity', style: Theme.of(context).textTheme.titleLarge),
+              Text(milestone?.name ?? t.fieldActivityDefault, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 4),
-              Text('Status: ${bundle.activity.status}', style: TextStyle(color: Colors.grey.shade600)),
+              Text(t.statusLabel(bundle.activity.status), style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 16),
 
               if (isRejected)
@@ -347,9 +358,9 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Sent back by your supervisor', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900)),
+                            Text(t.sentBackBySupervisor, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900)),
                             const SizedBox(height: 4),
-                            Text(bundle.approval?.remarks ?? 'No reason given.', style: TextStyle(color: Colors.red.shade900)),
+                            Text(bundle.approval?.remarks ?? t.noReasonGiven, style: TextStyle(color: Colors.red.shade900)),
                           ],
                         ),
                       ),
@@ -361,14 +372,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.shade200)),
-                  child: Text('Waiting for your supervisor to review this visit.', style: TextStyle(color: Colors.amber.shade900)),
+                  child: Text(t.waitingForReview, style: TextStyle(color: Colors.amber.shade900)),
                 ),
               if (isApproved)
                 Container(
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade200)),
-                  child: Text('Approved by your supervisor.', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
+                  child: Text(t.approvedBySupervisor, style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold)),
                 ),
 
               // Spec §14: "detected -> user warned -> user selects reason + remarks -> submits
@@ -387,14 +398,14 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_flaggedPointMessage(_flaggedPoint!), style: TextStyle(color: Colors.amber.shade900)),
+                            Text(_flaggedPointMessage(t, _flaggedPoint!), style: TextStyle(color: Colors.amber.shade900)),
                             const SizedBox(height: 8),
                             OutlinedButton(
                               onPressed: () => _openDeviationDialog(
                                 prefilledType: _flaggedTypeFor(_flaggedPoint!),
                                 distanceMeters: _flaggedPoint!.distanceFromPlannedMeters,
                               ),
-                              child: const Text('Explain'),
+                              child: Text(t.explain),
                             ),
                           ],
                         ),
@@ -404,7 +415,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 ),
 
               if (bundle.sopItems.isNotEmpty && !hasCheckIn) ...[
-                Text('Pre-activity checklist', style: Theme.of(context).textTheme.titleMedium),
+                Text(t.preActivityChecklist, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 ...bundle.sopItems.map((item) => _SopChecklistTile(
                       item: item,
@@ -416,18 +427,18 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
               _RequirementTile(
                 icon: Icons.my_location,
-                label: 'GPS check-in',
+                label: t.gpsCheckIn,
                 done: hasCheckIn,
-                subtitle: needsGps ? 'Required' : 'Not required for this milestone',
+                subtitle: needsGps ? t.required : t.notRequiredForMilestone,
               ),
               _RequirementTile(
                 icon: Icons.camera_alt,
-                label: 'Photos',
+                label: t.photos,
                 done: photoCount >= requiredPhotos,
-                subtitle: '$photoCount of $requiredPhotos captured',
+                subtitle: t.photosCountCaptured('$photoCount', '$requiredPhotos'),
               ),
               if (needsForm)
-                _RequirementTile(icon: Icons.assignment, label: 'Outlet Visit form', done: hasFormResponse, subtitle: hasFormResponse ? 'Submitted' : 'Not submitted yet'),
+                _RequirementTile(icon: Icons.assignment, label: t.outletVisitForm, done: hasFormResponse, subtitle: hasFormResponse ? t.submitted : t.notSubmittedYet),
 
               const SizedBox(height: 20),
 
@@ -435,7 +446,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 ElevatedButton.icon(
                   onPressed: _actionInProgress ? null : _checkIn,
                   icon: const Icon(Icons.my_location),
-                  label: const Text('Check in'),
+                  label: Text(t.checkIn),
                 ),
               if (hasCheckIn && (photoCount < requiredPhotos || isRejected))
                 Padding(
@@ -451,7 +462,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             await _load();
                           },
                     icon: const Icon(Icons.camera_alt),
-                    label: Text(isRejected ? 'Retake opening photo' : 'Take opening photo'),
+                    label: Text(isRejected ? t.retakeOpeningPhoto : t.takeOpeningPhoto),
                   ),
                 ),
               if (hasCheckIn && needsForm && (!hasFormResponse || isRejected))
@@ -472,7 +483,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                             await _load();
                           },
                     icon: const Icon(Icons.assignment),
-                    label: Text(isRejected ? 'Edit outlet form' : 'Fill outlet form'),
+                    label: Text(isRejected ? t.editOutletForm : t.fillOutletForm),
                   ),
                 ),
               if (canCheckOut)
@@ -481,7 +492,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _actionInProgress ? null : _checkOut,
                     icon: const Icon(Icons.check_circle),
-                    label: const Text('Check out — complete activity'),
+                    label: Text(t.checkOutComplete),
                   ),
                 ),
               if (isRejected)
@@ -490,13 +501,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _actionInProgress ? null : _resubmit,
                     icon: const Icon(Icons.send),
-                    label: const Text('Resubmit for review'),
+                    label: Text(t.resubmitForReview),
                   ),
                 ),
               if (hasCheckOut && !isRejected && !isPendingReview && !isApproved)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text('Activity completed.', style: TextStyle(fontWeight: FontWeight.bold)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(t.activityCompleted, style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
 
               if (hasCheckIn && !hasCheckOut) ...[
@@ -506,7 +517,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
                     const SizedBox(width: 4),
                     Text(
-                      _gpsCaptureError == null ? 'Location tracking on' : 'Location tracking paused',
+                      _gpsCaptureError == null ? t.locationTrackingOn : t.locationTrackingPaused,
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ],
@@ -515,13 +526,13 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 OutlinedButton.icon(
                   onPressed: () => _openDeviationDialog(),
                   icon: const Icon(Icons.report_problem_outlined),
-                  label: const Text('Report a deviation from plan'),
+                  label: Text(t.reportDeviationFromPlan),
                 ),
               ],
 
               if (outbox.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text('Sync status', style: Theme.of(context).textTheme.titleMedium),
+                Text(t.syncStatus, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 ...outbox.map((item) => _OutboxStatusTile(
                       item: item,
@@ -540,7 +551,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                 TextButton.icon(
                   onPressed: _syncNow,
                   icon: const Icon(Icons.sync),
-                  label: const Text('Sync now'),
+                  label: Text(t.syncNow),
                 ),
               ],
             ],
@@ -559,6 +570,7 @@ class _SopChecklistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final done = item.status == 'COMPLETED' || item.status == 'NOT_APPLICABLE';
     return ListTile(
       dense: true,
@@ -567,19 +579,19 @@ class _SopChecklistTile extends StatelessWidget {
         color: done ? Colors.green : (item.isMandatory ? Colors.orange : Colors.grey),
       ),
       title: Text(item.label),
-      subtitle: Text(item.isMandatory ? 'Mandatory' : 'Optional'),
+      subtitle: Text(item.isMandatory ? t.mandatory : t.optional),
       trailing: done
-          ? Text(item.status == 'COMPLETED' ? 'Done' : 'N/A', style: const TextStyle(color: Colors.green))
+          ? Text(item.status == 'COMPLETED' ? t.done : t.notApplicableShort, style: const TextStyle(color: Colors.green))
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextButton(
                   onPressed: enabled ? () => onMark('NOT_APPLICABLE') : null,
-                  child: const Text('N/A'),
+                  child: Text(t.notApplicableShort),
                 ),
                 TextButton(
                   onPressed: enabled ? () => onMark('COMPLETED') : null,
-                  child: const Text('Done'),
+                  child: Text(t.done),
                 ),
               ],
             ),
@@ -650,6 +662,7 @@ class _OutboxStatusTileState extends State<_OutboxStatusTile> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final item = widget.item;
     final Color color = switch (item.status) {
       'synced' => Colors.green,
@@ -660,7 +673,7 @@ class _OutboxStatusTileState extends State<_OutboxStatusTile> {
     return ListTile(
       dense: true,
       leading: Icon(Icons.circle, size: 12, color: color),
-      title: Text(_labelFor(item.type)),
+      title: Text(_labelFor(t, item.type)),
       subtitle: item.errorMessage == null
           ? null
           : Column(
@@ -670,7 +683,7 @@ class _OutboxStatusTileState extends State<_OutboxStatusTile> {
                 InkWell(
                   onTap: () => setState(() => _showTechnicalDetail = !_showTechnicalDetail),
                   child: Text(
-                    _showTechnicalDetail ? 'Hide technical details' : 'Technical details',
+                    _showTechnicalDetail ? t.hideTechnicalDetails : t.technicalDetails,
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline),
                   ),
                 ),
@@ -679,16 +692,16 @@ class _OutboxStatusTileState extends State<_OutboxStatusTile> {
               ],
             ),
       trailing: widget.onRetake != null
-          ? TextButton(onPressed: widget.onRetake, child: const Text('Retake'))
+          ? TextButton(onPressed: widget.onRetake, child: Text(t.retake))
           : Text(item.status),
     );
   }
 
-  String _labelFor(String type) => switch (type) {
-        'checkIn' => 'Check-in',
-        'checkOut' => 'Check-out',
-        'media' => 'Photo',
-        'milestoneResponse' => 'Form submission',
+  String _labelFor(AppLocalizations t, String type) => switch (type) {
+        'checkIn' => t.outboxTypeCheckIn,
+        'checkOut' => t.outboxTypeCheckOut,
+        'media' => t.outboxTypePhoto,
+        'milestoneResponse' => t.outboxTypeFormSubmission,
         _ => type,
       };
 }
@@ -715,10 +728,23 @@ class _DeviationDialogState extends State<_DeviationDialog> {
   bool _submitting = false;
   String? _error;
 
+  static const _deviationTypeKeys = [
+    'OUTSIDE_PERMITTED_RADIUS',
+    'UNPLANNED_LOCATION',
+    'SKIPPED_LOCATION',
+    'WRONG_SEQUENCE',
+    'LATE_ARRIVAL',
+    'EARLY_DEPARTURE',
+    'UNPLANNED_STOPPAGE',
+    'GPS_DISABLED',
+    'ABNORMAL_SPEED',
+    'SUSPECTED_LOCATION_MANIPULATION',
+  ];
+
   @override
   void initState() {
     super.initState();
-    _type = widget.initialType ?? _deviationTypeLabels.keys.first;
+    _type = widget.initialType ?? _deviationTypeKeys.first;
   }
 
   @override
@@ -730,7 +756,7 @@ class _DeviationDialogState extends State<_DeviationDialog> {
 
   Future<void> _submit() async {
     if (_reasonController.text.trim().isEmpty) {
-      setState(() => _error = 'Please explain what happened.');
+      setState(() => _error = AppLocalizations.of(context)!.pleaseExplainWhatHappened);
       return;
     }
     setState(() {
@@ -749,20 +775,22 @@ class _DeviationDialogState extends State<_DeviationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    final deviationTypeLabels = _deviationTypeLabels(t);
     return AlertDialog(
-      title: const Text('Report a deviation'),
+      title: Text(t.reportADeviation),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('This visit keeps going — this just records why, for your supervisor to review.'),
+            Text(t.deviationExplainerText),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _type,
-              decoration: const InputDecoration(labelText: 'What happened?'),
-              items: _deviationTypeLabels.entries
-                  .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+              decoration: InputDecoration(labelText: t.whatHappened),
+              items: _deviationTypeKeys
+                  .map((key) => DropdownMenuItem(value: key, child: Text(deviationTypeLabels[key]!)))
                   .toList(),
               onChanged: _submitting ? null : (v) => setState(() => _type = v!),
             ),
@@ -770,14 +798,14 @@ class _DeviationDialogState extends State<_DeviationDialog> {
             TextField(
               controller: _reasonController,
               enabled: !_submitting,
-              decoration: const InputDecoration(labelText: 'Reason *'),
+              decoration: InputDecoration(labelText: t.reasonLabel),
               maxLines: 2,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _remarksController,
               enabled: !_submitting,
-              decoration: const InputDecoration(labelText: 'Remarks (optional)'),
+              decoration: InputDecoration(labelText: t.remarksOptionalLabel),
               maxLines: 2,
             ),
             if (_error != null) ...[
@@ -788,8 +816,8 @@ class _DeviationDialogState extends State<_DeviationDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: _submitting ? null : () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        ElevatedButton(onPressed: _submitting ? null : _submit, child: Text(_submitting ? 'Sending…' : 'Submit')),
+        TextButton(onPressed: _submitting ? null : () => Navigator.of(context).pop(), child: Text(t.cancel)),
+        ElevatedButton(onPressed: _submitting ? null : _submit, child: Text(_submitting ? t.sending : t.submit)),
       ],
     );
   }

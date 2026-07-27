@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/location/get_current_position.dart';
 import '../../core/providers.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Camera-only opening evidence (spec §17: "Mandatory evidence is camera-only... no gallery for
 /// evidence fields") — this screen only ever offers the live camera, never a file/gallery picker.
@@ -43,7 +44,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _error = 'No camera found on this device');
+        setState(() => _error = AppLocalizations.of(context)!.noCameraFound);
         return;
       }
       final back = cameras.firstWhere(
@@ -58,7 +59,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
       if (!mounted) return;
       setState(() => _controller = controller);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Camera unavailable: $e');
+      if (mounted) setState(() => _error = AppLocalizations.of(context)!.cameraUnavailable('$e'));
     }
   }
 
@@ -86,7 +87,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
         _capturedAt = DateTime.now();
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not capture photo: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.couldNotCapturePhoto('$e'))),
+        );
+      }
     }
   }
 
@@ -105,7 +110,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
     final capturedAt = _capturedAt;
     if (file == null || position == null || capturedAt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location is required before this photo can be used — try again')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.locationRequiredRetry)),
       );
       return;
     }
@@ -150,16 +155,17 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Camera')),
+        appBar: AppBar(title: Text(t.cameraTitle)),
         body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!))),
       );
     }
 
     if (_capturedFile != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Review photo')),
+        appBar: AppBar(title: Text(t.reviewPhotoTitle)),
         body: Column(
           children: [
             Expanded(child: Image.file(File(_capturedFile!.path))),
@@ -169,8 +175,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
                 _capturedPosition != null
                     ? '${_capturedPosition!.latitude.toStringAsFixed(6)}, '
                         '${_capturedPosition!.longitude.toStringAsFixed(6)} — ${_capturedAt!.toLocal()}'
-                    : '${_positionError ?? 'Location unavailable'} — this photo cannot be used yet. '
-                        'Retake after fixing this.',
+                    : t.cannotBeUsedRetake(_positionError ?? t.locationUnavailable),
                 textAlign: TextAlign.center,
                 style: _capturedPosition == null ? const TextStyle(color: Colors.red) : null,
               ),
@@ -183,12 +188,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
                   OutlinedButton.icon(
                     onPressed: _saving ? null : _retake,
                     icon: const Icon(Icons.replay),
-                    label: const Text('Retake'),
+                    label: Text(t.retake),
                   ),
                   ElevatedButton.icon(
                     onPressed: _saving ? null : _confirm,
                     icon: const Icon(Icons.check),
-                    label: Text(_saving ? 'Saving…' : 'Use this photo'),
+                    label: Text(_saving ? t.savingPhoto : t.useThisPhoto),
                   ),
                 ],
               ),
@@ -203,7 +208,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Opening photo')),
+      appBar: AppBar(title: Text(t.openingPhotoTitle)),
       body: Column(
         children: [
           Expanded(child: CameraPreview(controller)),

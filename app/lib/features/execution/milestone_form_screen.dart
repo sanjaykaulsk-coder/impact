@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/app_localizations.dart';
 import 'execution_models.dart';
 
 /// Stage 3.1 renderer: covers the full field-type palette the web builder can produce, including
@@ -67,25 +68,26 @@ class _MilestoneFormScreenState extends ConsumerState<MilestoneFormScreen> {
     return total;
   }
 
-  String? _rangeViolation(FormQuestion question, dynamic value) {
+  String? _rangeViolation(AppLocalizations t, FormQuestion question, dynamic value) {
     if (value is! num) return null;
     final min = question.controlsJson['min'];
     final max = question.controlsJson['max'];
-    if (min is num && value < min) return '${question.label}: minimum is $min';
-    if (max is num && value > max) return '${question.label}: maximum is $max';
+    if (min is num && value < min) return t.minimumIs(question.label, min);
+    if (max is num && value > max) return t.maximumIs(question.label, max);
     return null;
   }
 
   Future<void> _submit() async {
+    final t = AppLocalizations.of(context)!;
     final visibleQuestions = _allQuestions.where(_isVisible).toList();
 
     final missing = visibleQuestions.where((q) => q.isMandatory && _values[q.id] == null).toList();
     if (missing.isNotEmpty) {
-      setState(() => _error = 'Please answer: ${missing.map((q) => q.label).join(', ')}');
+      setState(() => _error = t.pleaseAnswerFields(missing.map((q) => q.label).join(', ')));
       return;
     }
     final violations = visibleQuestions
-        .map((q) => _rangeViolation(q, _values[q.id]))
+        .map((q) => _rangeViolation(t, q, _values[q.id]))
         .whereType<String>()
         .toList();
     if (violations.isNotEmpty) {
@@ -153,7 +155,7 @@ class _MilestoneFormScreenState extends ConsumerState<MilestoneFormScreen> {
           const SizedBox(height: 12),
           ElevatedButton(
             onPressed: _submitting ? null : _submit,
-            child: _submitting ? const CircularProgressIndicator() : const Text('Submit'),
+            child: _submitting ? const CircularProgressIndicator() : Text(AppLocalizations.of(context)!.submit),
           ),
         ],
       ),
@@ -240,24 +242,25 @@ class _QuestionFieldState extends State<_QuestionField> {
       widget.onChanged(next.isEmpty ? null : next);
     }
 
+    final t = AppLocalizations.of(context)!;
     return _pad(Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(_label, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 8),
         TextField(
-          decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: t.nameLabel, border: const OutlineInputBorder()),
           onChanged: (v) => update('name', v),
         ),
         const SizedBox(height: 8),
         TextField(
           keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(labelText: 'Mobile', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: t.mobileLabel, border: const OutlineInputBorder()),
           onChanged: (v) => update('mobile', v),
         ),
         const SizedBox(height: 8),
         TextField(
-          decoration: const InputDecoration(labelText: 'Address / landmark', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: t.addressLandmarkLabel, border: const OutlineInputBorder()),
           onChanged: (v) => update('address', v),
         ),
       ],
@@ -290,6 +293,7 @@ class _QuestionFieldState extends State<_QuestionField> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     switch (widget.question.fieldType) {
       case 'SHORT_TEXT':
         return _textInput();
@@ -323,7 +327,7 @@ class _QuestionFieldState extends State<_QuestionField> {
                 widget.onChanged(iso);
               }
             },
-            child: Text(_controller.text.isEmpty ? 'Select a date' : _controller.text),
+            child: Text(_controller.text.isEmpty ? t.selectADate : _controller.text),
           ),
         ));
       case 'TIME':
@@ -339,7 +343,7 @@ class _QuestionFieldState extends State<_QuestionField> {
                 widget.onChanged(text);
               }
             },
-            child: Text(_controller.text.isEmpty ? 'Select a time' : _controller.text),
+            child: Text(_controller.text.isEmpty ? t.selectATime : _controller.text),
           ),
         ));
       case 'DATETIME':
@@ -366,7 +370,7 @@ class _QuestionFieldState extends State<_QuestionField> {
               setState(() => _controller.text = iso.substring(0, 16).replaceFirst('T', ' '));
               widget.onChanged(iso);
             },
-            child: Text(_controller.text.isEmpty ? 'Select date & time' : _controller.text),
+            child: Text(_controller.text.isEmpty ? t.selectDateTime : _controller.text),
           ),
         ));
       case 'DROPDOWN':
@@ -429,10 +433,10 @@ class _QuestionFieldState extends State<_QuestionField> {
           decoration: InputDecoration(
             labelText: widget.question.label,
             border: const OutlineInputBorder(),
-            helperText: 'Calculated automatically — never typed in',
+            helperText: t.calculatedAutomatically,
           ),
           child: Text(
-            widget.computedValue != null ? widget.computedValue.toString() : 'Computed at report time',
+            widget.computedValue != null ? widget.computedValue.toString() : t.computedAtReportTime,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ));
@@ -441,17 +445,17 @@ class _QuestionFieldState extends State<_QuestionField> {
       case 'AUTO_ACTIVITY_ID':
       case 'AUTO_CAMPAIGN_ID':
       case 'AUTO_LOCATION':
-        return _note('${widget.question.label} — filled in automatically on the server.');
+        return _note(t.filledAutomaticallyOnServer(widget.question.label));
       case 'PHOTO':
       case 'MULTIPLE_PHOTOS':
       case 'GPS':
-        return _note('$_label — captured through the evidence flow (camera + GPS), not typed into this form.');
+        return _note(t.capturedThroughEvidenceFlow(_label));
       case 'SHORT_VIDEO':
       case 'SIGNATURE':
       case 'DOCUMENT':
-        return _note('$_label — capture for this evidence type arrives in a later build stage.');
+        return _note(t.captureArrivesLaterBuild(_label));
       default:
-        return _note('$_label — unsupported field type (${widget.question.fieldType}) in this build.');
+        return _note(t.unsupportedFieldType(_label, widget.question.fieldType));
     }
   }
 }

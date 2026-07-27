@@ -14,8 +14,10 @@ import 'package:field_command/features/auth/auth_state.dart';
 import 'package:field_command/features/execution/execution_models.dart';
 import 'package:field_command/features/execution/execution_repository.dart';
 import 'package:field_command/features/home/campaign_home_screen.dart';
+import 'package:field_command/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,7 +28,7 @@ import 'package:flutter_test/flutter_test.dart';
 const _unusedStorage = FlutterSecureStorage();
 
 class _FixedAuthController extends AuthController {
-  _FixedAuthController(super.repository, AuthState fixedState) {
+  _FixedAuthController(super.repository, super.ref, AuthState fixedState) {
     state = fixedState;
   }
 }
@@ -104,11 +106,18 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(fakeRepo),
-          authControllerProvider.overrideWith((ref) => _FixedAuthController(fakeRepo, fixedState)),
+          authControllerProvider.overrideWith((ref) => _FixedAuthController(fakeRepo, ref, fixedState)),
           executionRepositoryProvider.overrideWithValue(_FakeExecutionRepository()),
         ],
         child: MaterialApp(
           theme: buildBaseTheme(),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
           home: const CampaignHomeScreen(),
         ),
       ),

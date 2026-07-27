@@ -7,6 +7,8 @@ import 'package:http_parser/http_parser.dart';
 
 import 'token_store.dart';
 
+typedef SessionExpiredCallback = void Function();
+
 class ApiException implements Exception {
   final int statusCode;
   final String message;
@@ -40,6 +42,13 @@ class ApiClient {
   final TokenStore tokenStore;
   final String baseUrl;
   final http.Client _http;
+
+  /// Set by AuthController once it's constructed — a genuinely dead session (refresh definitively
+  /// failed) needs to flip the app's own auth state so the router sends the user back to /login,
+  /// rather than leaving whatever screen was showing stuck half-loaded with no way forward (the
+  /// second half of the founder's real-device "it bugs" report: a truly-expired session recovered
+  /// silently on the network layer but never told the UI).
+  SessionExpiredCallback? onSessionExpired;
 
   // Refresh tokens rotate server-side (token.service.ts's rotate(): each use revokes the
   // presented token and issues a fresh pair). The home screen fires several requests at once on
@@ -77,6 +86,9 @@ class ApiClient {
         break;
       case 'POST':
         res = await _http.post(uri, headers: headers, body: encodedBody).timeout(_requestTimeout);
+        break;
+      case 'PATCH':
+        res = await _http.patch(uri, headers: headers, body: encodedBody).timeout(_requestTimeout);
         break;
       default:
         throw UnsupportedError('Unsupported method $method');
@@ -118,7 +130,7 @@ class ApiClient {
           )
           .timeout(_requestTimeout);
       if (res.statusCode != 200) {
-        await tokenStore.clear();
+        await _clearIfStillCurrent(refresh);
         return false;
       }
       final decoded = jsonDecode(res.body) as Map<String, dynamic>;
@@ -128,8 +140,24 @@ class ApiClient {
       );
       return true;
     } catch (_) {
-      await tokenStore.clear();
+      await _clearIfStillCurrent(refresh);
       return false;
+    }
+  }
+
+  /// A request from a screen the user already navigated away from can still be resolving in the
+  /// background (Dart futures aren't cancelled on dispose) and reach its own 401-triggered refresh
+  /// late — using a refresh token that, by then, a different, newer, successful refresh has
+  /// already rotated away. Refresh tokens rotate single-use, so this attempt legitimately gets
+  /// rejected; without this guard it would then blindly clear the token store, wiping out the
+  /// newer, perfectly valid pair that already replaced it and silently logging the user out for
+  /// no real reason (found via a real device repro: back out of a screen, reselect, and the app
+  /// gets stuck "unauthorized" even though the server-side session was fine).
+  Future<void> _clearIfStillCurrent(String refreshTokenThisAttemptUsed) async {
+    final current = await tokenStore.refreshToken;
+    if (current == refreshTokenThisAttemptUsed) {
+      await tokenStore.clear();
+      onSessionExpired?.call();
     }
   }
 
@@ -137,6 +165,7 @@ class ApiClient {
   Future<dynamic> postPublic(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body, auth: false);
   Future<dynamic> post(String path, Map<String, dynamic> body) => _request('POST', path, body: body);
+  Future<dynamic> patch(String path, Map<String, dynamic> body) => _request('PATCH', path, body: body);
 
   /// A raw-bytes GET (map tiles, so far) — same host resolution and bearer-token auth as every
   /// JSON call, just skipping the JSON decode step.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 
 class CampaignSelectScreen extends ConsumerWidget {
@@ -10,9 +11,10 @@ class CampaignSelectScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(authControllerProvider);
+    final t = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select campaign'),
+        title: Text(t.selectCampaignTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -29,16 +31,19 @@ class CampaignSelectScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Hello, ${state.user?.fullName ?? ''}', style: const TextStyle(fontSize: 16)),
+              Text(
+                t.helloUser(state.user?.fullName ?? ''),
+                style: const TextStyle(fontSize: 16),
+              ),
               const SizedBox(height: 4),
               Text(
-                'You have access to ${state.campaigns.length} campaign(s).',
+                t.accessToCampaigns(state.campaigns.length),
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: state.campaigns.isEmpty
-                    ? const Center(child: Text('No active campaign role yet. Contact your administrator.'))
+                    ? Center(child: Text(t.noActiveCampaignRole))
                     : ListView.separated(
                         itemCount: state.campaigns.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -52,11 +57,20 @@ class CampaignSelectScreen extends ConsumerWidget {
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.all(14),
-                              title: Text(c.campaignName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text('${c.clientName} · ${c.roleName}'),
+                              title: Text(
+                                c.campaignName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                t.clientRoleLine(c.clientName, c.roleName),
+                              ),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () {
-                                ref.read(authControllerProvider.notifier).selectCampaign(c.campaignId);
+                                ref
+                                    .read(authControllerProvider.notifier)
+                                    .selectCampaign(c.campaignId);
                                 context.go('/home');
                               },
                             ),

@@ -11,6 +11,14 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
+  # Regional languages (Post-MVP backlog): standard Flutter i18n — ARB-file translations codegen'd
+  # into a typed AppLocalizations class, not a hand-rolled string map. This is the extensible path
+  # (see docs/ASSUMPTIONS.md) since the whole point is room to add more languages later, not just
+  # this one pair.
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
   # State management + navigation (CLAUDE.md locked decisions)
   flutter_riverpod: ^2.6.1
   go_router: ^14.6.2
@@ -57,6 +65,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/brand/
 

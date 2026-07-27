@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import 'auth_controller.dart';
 
 /// Shown when device binding refuses this device (spec §7: "device-change approval" — the account
@@ -13,8 +14,8 @@ class DevicePendingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final message = ref.watch(authControllerProvider).devicePendingMessage ??
-        'This device needs approval before it can be used.';
+    final t = AppLocalizations.of(context)!;
+    final message = ref.watch(authControllerProvider).devicePendingMessage ?? t.devicePendingDefaultMessage;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -27,9 +28,9 @@ class DevicePendingScreen extends ConsumerWidget {
                 children: [
                   const Icon(Icons.pending_actions, size: 48, color: Color(0xFF8A5B00)),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Device pending approval',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  Text(
+                    t.devicePendingTitle,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
@@ -40,7 +41,7 @@ class DevicePendingScreen extends ConsumerWidget {
                       ref.read(authControllerProvider.notifier).clearDevicePending();
                       context.go('/login');
                     },
-                    child: const Text('Back to login'),
+                    child: Text(t.backToLogin),
                   ),
                 ],
               ),

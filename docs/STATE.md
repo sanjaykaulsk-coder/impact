@@ -1,6 +1,19 @@
 # STATE.md — IMPACT FIELD COMMAND
 
-**Last updated:** 27 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 — APPROVED. S5.4 — CONFIRMED WORKING on founder's machine — this completed the entire planned MVP build sequence. Post-MVP backlog: PDF/PowerPoint report exports — CONFIRMED WORKING. Configurable dashboard engine for clients — CONFIRMED WORKING. Offline map corridors — CONFIRMED WORKING on founder's own physical phone. Perceptual duplicate detection — built and verified against a real running backend, awaiting founder review. Two items remain untouched: regional languages, AI image analysis.**
+**Last updated:** 27 July 2026 · **Phase:** C — approved. **Stage 2 (A, B, C) — ALL COMPLETE. Stage 3 (3.1–3.4) — ALL APPROVED. Full database security hardening — DONE, verified. Stage 4 (4.1, 4.2, 4.3) — ALL APPROVED. S5.1 — APPROVED. S5.2 — APPROVED. S5.3 — APPROVED. S5.4 — CONFIRMED WORKING on founder's machine — this completed the entire planned MVP build sequence. Post-MVP backlog: PDF/PowerPoint report exports — CONFIRMED WORKING. Configurable dashboard engine for clients — CONFIRMED WORKING. Offline map corridors — CONFIRMED WORKING on founder's own physical phone. Perceptual duplicate detection — CONFIRMED WORKING, founder viewed the flag live on the Device Risk page. Regional languages (EN/HI) — CONFIRMED WORKING on founder's own physical phone, including two navigation/session bugs found during that testing and fixed. One item remains untouched: AI image analysis.**
+
+## Post-MVP backlog — Regional languages (this session, founder picked this after perceptual duplicate detection)
+
+The founder's own early decisions (A-002, A-010) had committed to Hindi + English for the field app, but this was never actually built — every screen was hardcoded English, and only one place (a sync-error message) had any Hindi at all. Flagged this plainly before starting; the founder's answer was to build both languages properly and give the user an explicit choice, rather than a fixed default.
+
+- **Real translation infrastructure** — Flutter's standard `flutter_localizations`/`intl` + ARB files, not a hand-rolled string map. Every screen in the field app (login, OTP, campaign selection, home, activity detail, camera, forms, route map) now has genuine, correct Hindi translations, not machine-placeholder text.
+- **A language toggle, not a fixed default** — English/हिन्दी switcher on the very first screen (before login) and a language icon on the home screen (after login). The choice is saved on the phone and synced to the account, so it follows the user across devices.
+- **Two real bugs found and fixed via the founder's own live testing on their physical phone, both pre-existing navigation/session issues that this feature's testing happened to surface**: pressing back after selecting a project was exiting the app instead of returning to the project list (fixed); and a token-refresh race could, in rare timing, wipe out a perfectly valid session and get the user stuck on a broken screen with no way forward (fixed, with a proper redirect-to-login safety net added for the case where a session is genuinely dead).
+- **Verified**: `flutter analyze` clean; full Flutter test suite unchanged (one pre-existing, unrelated test failure confirmed via `git stash` to predate this work); backend clean; QA grep clean. Confirmed working end-to-end on the founder's own physical phone across three rebuilds.
+
+### Reviewing — Regional languages
+
+Open the app and try the language toggle on the login screen and the home screen's language icon — everything should read correctly in both English and Hindi. Also worth trying: select a project, use the back arrow to return to the project list, and select again — this used to break and is now fixed.
 
 ## Post-MVP backlog — Perceptual duplicate detection (this session, founder picked this from the remaining three)
 

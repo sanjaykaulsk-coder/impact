@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../l10n/app_localizations.dart';
 import 'auth_controller.dart';
 
 class OtpEntryScreen extends ConsumerStatefulWidget {
@@ -58,8 +59,9 @@ class _OtpEntryScreenState extends ConsumerState<OtpEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify OTP')),
+      appBar: AppBar(title: Text(t.verifyOtpTitle)),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -74,7 +76,7 @@ class _OtpEntryScreenState extends ConsumerState<OtpEntryScreen> {
                   children: [
                     Row(
                       children: [
-                        Flexible(child: Text('Code sent to ${widget.mobileNumber}')),
+                        Flexible(child: Text(t.codeSentTo(widget.mobileNumber))),
                         if (widget.otpProvider == 'MOCK') ...[
                           const SizedBox(width: 6),
                           Container(
@@ -83,9 +85,9 @@ class _OtpEntryScreenState extends ConsumerState<OtpEntryScreen> {
                               color: const Color(0xFFFFF4D6),
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Text(
-                              'MOCK — NO SMS SENT',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF8A5B00)),
+                            child: Text(
+                              t.mockNoSmsSent,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF8A5B00)),
                             ),
                           ),
                         ],
@@ -100,8 +102,7 @@ class _OtpEntryScreenState extends ConsumerState<OtpEntryScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'Development mode: your OTP is ${widget.devOtpCode} '
-                          '(shown here only because OTP_PROVIDER=mock).',
+                          t.devOtpMessage(widget.devOtpCode!),
                           style: const TextStyle(color: Color(0xFF8A5B00)),
                         ),
                       ),
@@ -122,16 +123,16 @@ class _OtpEntryScreenState extends ConsumerState<OtpEntryScreen> {
                       controller: _codeController,
                       keyboardType: TextInputType.number,
                       maxLength: 8,
-                      decoration: const InputDecoration(labelText: 'OTP code', counterText: ''),
+                      decoration: InputDecoration(labelText: t.otpCodeLabel, counterText: ''),
                       validator: (value) =>
-                          (value == null || value.trim().length < 4) ? 'Enter the OTP code' : null,
+                          (value == null || value.trim().length < 4) ? t.otpCodeValidationError : null,
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _busy ? null : _submit,
-                        child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
+                        child: Text(_busy ? t.verifying : t.verifyAndSignIn),
                       ),
                     ),
                   ],

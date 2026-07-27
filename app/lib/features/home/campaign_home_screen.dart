@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/models.dart';
+import '../../core/locale/language_toggle.dart';
 import '../../core/location/get_current_position.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../execution/execution_models.dart';
 
@@ -25,19 +27,25 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
 
   void _reloadAssignments(String campaignId) {
     setState(() {
-      _assignmentsFuture = ref.read(executionRepositoryProvider).myAssignments().then(
-            (all) => all.where((a) => a.campaignId == campaignId).toList(),
-          );
+      _assignmentsFuture = ref
+          .read(executionRepositoryProvider)
+          .myAssignments()
+          .then((all) => all.where((a) => a.campaignId == campaignId).toList());
     });
   }
 
   void _reloadAttendance(String campaignId) {
     setState(() {
-      _attendanceFuture = ref.read(executionRepositoryProvider).todayAttendance(campaignId);
+      _attendanceFuture = ref
+          .read(executionRepositoryProvider)
+          .todayAttendance(campaignId);
     });
   }
 
-  Future<void> _markAttendance(String campaignId, {required bool isDayStart}) async {
+  Future<void> _markAttendance(
+    String campaignId, {
+    required bool isDayStart,
+  }) async {
     setState(() => _attendanceBusy = true);
     try {
       // Best-effort GPS — attendance is a lightweight day marker, not a field visit, so a denied
@@ -53,15 +61,28 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
       }
       final repo = ref.read(executionRepositoryProvider);
       if (isDayStart) {
-        await repo.markDayStart(campaignId, latitude: latitude, longitude: longitude);
+        await repo.markDayStart(
+          campaignId,
+          latitude: latitude,
+          longitude: longitude,
+        );
       } else {
-        await repo.markDayEnd(campaignId, latitude: latitude, longitude: longitude);
+        await repo.markDayEnd(
+          campaignId,
+          latitude: latitude,
+          longitude: longitude,
+        );
       }
       _reloadAttendance(campaignId);
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isDayStart ? 'Could not start your day: $e' : 'Could not end your day: $e')),
+          SnackBar(
+            content: Text(
+              isDayStart ? t.couldNotStartDay('$e') : t.couldNotEndDay('$e'),
+            ),
+          ),
         );
       }
     } finally {
@@ -71,6 +92,7 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final state = ref.watch(authControllerProvider);
     final campaignId = state.selectedCampaignId;
 
@@ -83,11 +105,16 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
 
     if (_loadedForCampaignId != campaignId) {
       _loadedForCampaignId = campaignId;
-      _brandingFuture = ref.read(authRepositoryProvider).campaignBranding(campaignId);
-      _assignmentsFuture = ref.read(executionRepositoryProvider).myAssignments().then(
-            (all) => all.where((a) => a.campaignId == campaignId).toList(),
-          );
-      _attendanceFuture = ref.read(executionRepositoryProvider).todayAttendance(campaignId);
+      _brandingFuture = ref
+          .read(authRepositoryProvider)
+          .campaignBranding(campaignId);
+      _assignmentsFuture = ref
+          .read(executionRepositoryProvider)
+          .myAssignments()
+          .then((all) => all.where((a) => a.campaignId == campaignId).toList());
+      _attendanceFuture = ref
+          .read(executionRepositoryProvider)
+          .todayAttendance(campaignId);
     }
 
     MyCampaignSummary? membership;
@@ -98,145 +125,214 @@ class _CampaignHomeScreenState extends ConsumerState<CampaignHomeScreen> {
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(membership?.campaignName ?? 'Campaign'),
-        actions: [
-          if (state.campaigns.length > 1)
+    // Both the app-bar icon and the hardware/gesture back button need to reach the project list
+    // the same explicit way (.go, not a push/pop pair — that turned out to be too fragile: whether
+    // a plain route push actually stays poppable depends on router-internal bookkeeping this app
+    // doesn't need to lean on). Only offered at all when there's more than one campaign to pick
+    // from — for a single-campaign account there's nothing to go back to.
+    final canSwitchCampaign = state.campaigns.length > 1;
+    return PopScope(
+      canPop: !canSwitchCampaign,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) context.go('/campaign-select');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: canSwitchCampaign
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: t.switchCampaign,
+                  onPressed: () => context.go('/campaign-select'),
+                )
+              : null,
+          title: Text(membership?.campaignName ?? t.defaultCampaignTitle),
+          actions: [
             IconButton(
-              icon: const Icon(Icons.swap_horiz),
-              tooltip: 'Switch campaign',
-              onPressed: () => context.go('/campaign-select'),
+              icon: const Icon(Icons.language),
+              tooltip: t.languageSettingTitle,
+              onPressed: () => showLanguagePickerDialog(context),
             ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authControllerProvider.notifier).logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
-      ),
-      body: FutureBuilder<CampaignBrandingResponse>(
-        future: _brandingFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Could not load campaign branding: ${snapshot.error}'));
-          }
-          final branding = snapshot.data!;
-          final primary = colorFromHex(branding.theme.primaryColor);
-          final secondary = colorFromHex(branding.theme.secondaryColor);
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await ref.read(authControllerProvider.notifier).logout();
+                if (context.mounted) context.go('/login');
+              },
+            ),
+          ],
+        ),
+        body: FutureBuilder<CampaignBrandingResponse>(
+          future: _brandingFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(t.couldNotLoadBranding('${snapshot.error}')),
+              );
+            }
+            final branding = snapshot.data!;
+            final primary = colorFromHex(branding.theme.primaryColor);
+            final secondary = colorFromHex(branding.theme.secondaryColor);
 
-          return SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(colors: [primary, secondary], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        branding.campaignName,
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            return SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        colors: [primary, secondary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(height: 4),
-                      Text(branding.clientName, style: const TextStyle(color: Colors.white70)),
-                      if (branding.instructionsText != null) ...[
-                        const SizedBox(height: 12),
-                        Text(branding.instructionsText!, style: const TextStyle(color: Colors.white)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          branding.campaignName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          branding.clientName,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        if (branding.instructionsText != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            branding.instructionsText!,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                _InfoTile(label: 'Signed in as', value: state.user?.fullName ?? ''),
-                _InfoTile(label: 'Role', value: membership?.roleName ?? ''),
-                if (branding.escalationContactName != null)
-                  _InfoTile(label: 'Escalation contact', value: branding.escalationContactName!),
-                const SizedBox(height: 16),
-                FutureBuilder<TodayAttendance>(
-                  future: _attendanceFuture,
-                  builder: (context, attendanceSnapshot) {
-                    final today = attendanceSnapshot.data;
-                    return _AttendanceCard(
-                      primary: primary,
-                      loading: attendanceSnapshot.connectionState != ConnectionState.done,
-                      busy: _attendanceBusy,
-                      dayStart: today?.dayStart,
-                      dayEnd: today?.dayEnd,
-                      onStartDay: () => _markAttendance(campaignId, isDayStart: true),
-                      onEndDay: () => _markAttendance(campaignId, isDayStart: false),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.map_outlined),
-                  label: const Text('View Route Map'),
-                  onPressed: () => context.push(
-                    '/route-map',
-                    extra: {'campaignId': campaignId, 'userId': state.user!.id},
+                  const SizedBox(height: 16),
+                  _InfoTile(
+                    label: t.signedInAs,
+                    value: state.user?.fullName ?? '',
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text('Today\'s assignments', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                FutureBuilder<List<MyAssignment>>(
-                  future: _assignmentsFuture,
-                  builder: (context, assignmentSnapshot) {
-                    if (assignmentSnapshot.connectionState != ConnectionState.done) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
+                  _InfoTile(
+                    label: t.roleLabel,
+                    value: membership?.roleName ?? '',
+                  ),
+                  if (branding.escalationContactName != null)
+                    _InfoTile(
+                      label: t.escalationContact,
+                      value: branding.escalationContactName!,
+                    ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<TodayAttendance>(
+                    future: _attendanceFuture,
+                    builder: (context, attendanceSnapshot) {
+                      final today = attendanceSnapshot.data;
+                      return _AttendanceCard(
+                        primary: primary,
+                        loading:
+                            attendanceSnapshot.connectionState !=
+                            ConnectionState.done,
+                        busy: _attendanceBusy,
+                        dayStart: today?.dayStart,
+                        dayEnd: today?.dayEnd,
+                        onStartDay: () =>
+                            _markAttendance(campaignId, isDayStart: true),
+                        onEndDay: () =>
+                            _markAttendance(campaignId, isDayStart: false),
                       );
-                    }
-                    if (assignmentSnapshot.hasError) {
-                      return _EmptyAssignmentsNotice(text: 'Could not load assignments: ${assignmentSnapshot.error}');
-                    }
-                    final assignments = assignmentSnapshot.data ?? const [];
-                    if (assignments.isEmpty) {
-                      return const _EmptyAssignmentsNotice(text: 'No assignments for this campaign yet.');
-                    }
-                    return Column(
-                      children: assignments
-                          .map(
-                            (a) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: Icon(
-                                  a.status == 'IN_PROGRESS' ? Icons.pending_actions : Icons.location_on_outlined,
-                                  color: primary,
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.map_outlined),
+                    label: Text(t.viewRouteMap),
+                    onPressed: () => context.push(
+                      '/route-map',
+                      extra: {
+                        'campaignId': campaignId,
+                        'userId': state.user!.id,
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    t.todaysAssignments,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<List<MyAssignment>>(
+                    future: _assignmentsFuture,
+                    builder: (context, assignmentSnapshot) {
+                      if (assignmentSnapshot.connectionState !=
+                          ConnectionState.done) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (assignmentSnapshot.hasError) {
+                        return _EmptyAssignmentsNotice(
+                          text: t.couldNotLoadAssignments(
+                            '${assignmentSnapshot.error}',
+                          ),
+                        );
+                      }
+                      final assignments = assignmentSnapshot.data ?? const [];
+                      if (assignments.isEmpty) {
+                        return _EmptyAssignmentsNotice(
+                          text: t.noAssignmentsYet,
+                        );
+                      }
+                      return Column(
+                        children: assignments
+                            .map(
+                              (a) => Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  leading: Icon(
+                                    a.status == 'IN_PROGRESS'
+                                        ? Icons.pending_actions
+                                        : Icons.location_on_outlined,
+                                    color: primary,
+                                  ),
+                                  title: Text(
+                                    a.pjpRow?.locationName ??
+                                        t.assignmentDefaultTitle,
+                                  ),
+                                  subtitle: Text(
+                                    a.pjpRow != null
+                                        ? t.assignmentSubtitleWithLocation(
+                                            a.pjpRow!.districtName,
+                                            a.pjpRow!.stateName,
+                                            a.status,
+                                          )
+                                        : a.status,
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () async {
+                                    await context.push('/activity/${a.id}');
+                                    _reloadAssignments(campaignId);
+                                  },
                                 ),
-                                title: Text(a.pjpRow?.locationName ?? 'Assignment'),
-                                subtitle: Text(
-                                  a.pjpRow != null
-                                      ? '${a.pjpRow!.districtName}, ${a.pjpRow!.stateName} — ${a.status}'
-                                      : a.status,
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () async {
-                                  await context.push('/activity/${a.id}');
-                                  _reloadAssignments(campaignId);
-                                },
                               ),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
-              ],
-            ),
-          );
-        },
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -324,6 +420,7 @@ class _AttendanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -332,22 +429,38 @@ class _AttendanceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: loading
-          ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 8), child: CircularProgressIndicator()))
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: CircularProgressIndicator(),
+              ),
+            )
           : Row(
               children: [
                 Icon(Icons.access_time, color: primary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: dayStart == null
-                      ? const Text('You haven\'t started your day yet')
+                      ? Text(t.haventStartedDay)
                       : dayEnd == null
-                          ? Text('Day started at ${_formatTime(dayStart!.checkTime)}')
-                          : Text('Day started ${_formatTime(dayStart!.checkTime)} · ended ${_formatTime(dayEnd!.checkTime)}'),
+                      ? Text(t.dayStartedAt(_formatTime(dayStart!.checkTime)))
+                      : Text(
+                          t.dayStartedEnded(
+                            _formatTime(dayStart!.checkTime),
+                            _formatTime(dayEnd!.checkTime),
+                          ),
+                        ),
                 ),
                 if (dayStart == null)
-                  ElevatedButton(onPressed: busy ? null : onStartDay, child: Text(busy ? 'Working…' : 'Start my day'))
+                  ElevatedButton(
+                    onPressed: busy ? null : onStartDay,
+                    child: Text(busy ? t.working : t.startMyDay),
+                  )
                 else if (dayEnd == null)
-                  ElevatedButton(onPressed: busy ? null : onEndDay, child: Text(busy ? 'Working…' : 'End my day')),
+                  ElevatedButton(
+                    onPressed: busy ? null : onEndDay,
+                    child: Text(busy ? t.working : t.endMyDay),
+                  ),
               ],
             ),
     );

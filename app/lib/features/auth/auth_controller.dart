@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/models.dart';
+import '../../core/locale/locale_controller.dart';
 import '../../core/providers.dart';
 import 'auth_repository.dart';
 import 'auth_state.dart';
@@ -16,7 +19,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository repository;
-  AuthController(this.repository) : super(const AuthState()) {
+  final Ref ref;
+  AuthController(this.repository, this.ref) : super(const AuthState()) {
+    // A genuinely dead session (ApiClient's refresh definitively failed) needs to flip this state
+    // so the router's redirect sends the user back to /login instead of leaving a half-loaded
+    // screen stuck with no way forward.
+    ref.read(apiClientProvider).onSessionExpired = () {
+      if (mounted) state = const AuthState(loading: false, authenticated: false);
+    };
     _restore();
   }
 
@@ -41,6 +51,9 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       final user = await repository.me();
       final campaigns = await repository.myCampaigns();
+      unawaited(
+        ref.read(localeControllerProvider.notifier).adoptServerPreferenceIfNoLocalChoiceYet(user.preferredLanguage),
+      );
       state = state.copyWith(
         loading: false,
         authenticated: true,
@@ -84,5 +97,5 @@ class AuthController extends StateNotifier<AuthState> {
 }
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
-  return AuthController(ref.watch(authRepositoryProvider));
+  return AuthController(ref.watch(authRepositoryProvider), ref);
 });
