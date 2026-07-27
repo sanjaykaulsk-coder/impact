@@ -1,7 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { AuditService } from '../../core/audit/audit.service';
+import { IMAGE_CONTENT_CLASSIFIER, ImageContentClassifier } from '../../core/media-ai/image-content-classifier.interface';
+import { analyzeImageQuality } from '../../core/media-ai/image-quality';
 import { postgisDistanceMeters } from '../../core/geo/postgis-distance';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
 import { computePerceptualHash, hammingDistance, PERCEPTUAL_DUPLICATE_THRESHOLD } from '../../core/storage/perceptual-hash';
@@ -47,6 +49,7 @@ export class ExecutionService {
     private readonly media: MediaStorageService,
     private readonly audit: AuditService,
     private readonly deviceRisk: DeviceRiskService,
+    @Inject(IMAGE_CONTENT_CLASSIFIER) private readonly contentClassifier: ImageContentClassifier,
   ) {}
 
   private assertOwnership(activity: { assignedUserId: string | null }, userId: string) {
@@ -396,11 +399,30 @@ export class ExecutionService {
     // unexpected image format sharp can't decode) never blocks a real upload, it just means this
     // one photo doesn't get compared against past ones.
     let perceptualHash: string | null = null;
+    // AI image analysis (Post-MVP backlog, spec §42) — same best-effort posture as the perceptual
+    // hash above: a quality-analysis or classifier failure never blocks a real upload.
+    let qualityBlurVariance: number | null = null;
+    let qualityBrightnessMean: number | null = null;
+    let qualityFlags: string[] = [];
+    let contentClassificationJson: Prisma.InputJsonValue | undefined;
     if (session.mimeType.startsWith('image/')) {
       try {
         perceptualHash = await computePerceptualHash(assembled);
       } catch {
         // leave null
+      }
+      try {
+        const quality = await analyzeImageQuality(assembled);
+        qualityBlurVariance = quality.blurVariance;
+        qualityBrightnessMean = quality.brightnessMean;
+        qualityFlags = quality.flags;
+      } catch {
+        // leave defaults
+      }
+      try {
+        contentClassificationJson = { ...(await this.contentClassifier.classify(assembled)) };
+      } catch {
+        // leave undefined
       }
     }
 
@@ -425,6 +447,10 @@ export class ExecutionService {
             sizeBytes: stored.sizeBytes,
             sha256Hash: stored.sha256Hash,
             perceptualHash,
+            qualityBlurVariance,
+            qualityBrightnessMean,
+            qualityFlags,
+            contentClassificationJson,
             latitude: session.latitude,
             longitude: session.longitude,
             capturedAt: session.capturedAt,

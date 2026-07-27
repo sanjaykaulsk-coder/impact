@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AuditModule } from './core/audit/audit.module';
+import { MediaAiModule } from './core/media-ai/media-ai.module';
 import { NotificationModule } from './core/notifications/notification.module';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { StorageModule } from './core/storage/storage.module';
@@ -34,6 +35,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuditModule,
+    MediaAiModule,
     NotificationModule,
     StorageModule,
     ActivityTemplatesModule,

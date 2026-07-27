@@ -1415,6 +1415,17 @@ model Media {
   // media rows created before this feature have none. sha256Hash alone only catches byte-identical
   // re-uploads; this catches a re-compressed, cropped, or re-photographed copy of the same scene.
   perceptualHash          String?
+  // AI image analysis (Post-MVP backlog, spec §42: "No AI image analysis... in MVP; keep the
+  // architecture ready for them"). Quality metrics are real, computed server-side at upload
+  // completion (see core/media-ai/image-quality.ts) — blur via variance-of-Laplacian, brightness
+  // via mean pixel value, resolution against a minimum floor. Nullable/empty because media rows
+  // created before this feature have none, and because analysis only runs for image/* mimeTypes.
+  qualityBlurVariance       Float?
+  qualityBrightnessMean     Float?
+  qualityFlags              String[]              @default([])
+  // Mocked adapter (docs/ASSUMPTIONS.md) — always `{"mock": true, ...}` until a real cloud vision
+  // provider is configured; never fabricated as if it were a real classification.
+  contentClassificationJson Json?
   latitude                Decimal?                @db.Decimal(9, 6)
   longitude               Decimal?                @db.Decimal(9, 6)
   capturedAt              DateTime?

@@ -561,6 +561,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not open Google Maps — check you have signal and a maps app installed.';
 
   @override
+  String get qualityFlagBlurry => 'blurry';
+
+  @override
+  String get qualityFlagTooDark => 'too dark';
+
+  @override
+  String get qualityFlagTooBright => 'overexposed';
+
+  @override
+  String qualityWarningMessage(Object issues) {
+    return 'This photo may be $issues — you can retake it or use it anyway.';
+  }
+
+  @override
+  String get useAnyway => 'Use anyway';
+
+  @override
   String get languageSettingTitle => 'Language / भाषा';
 
   @override

@@ -8,8 +8,16 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/location/get_current_position.dart';
+import '../../core/media_ai/on_device_image_quality.dart';
 import '../../core/providers.dart';
 import '../../l10n/app_localizations.dart';
+
+String _qualityFlagLabel(AppLocalizations t, String flag) => switch (flag) {
+      'BLURRY' => t.qualityFlagBlurry,
+      'TOO_DARK' => t.qualityFlagTooDark,
+      'TOO_BRIGHT' => t.qualityFlagTooBright,
+      _ => flag,
+    };
 
 /// Camera-only opening evidence (spec §17: "Mandatory evidence is camera-only... no gallery for
 /// evidence fields") — this screen only ever offers the live camera, never a file/gallery picker.
@@ -32,6 +40,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
   Position? _capturedPosition;
   String? _positionError;
   DateTime? _capturedAt;
+  List<String> _qualityFlags = [];
   bool _saving = false;
 
   @override
@@ -79,12 +88,24 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
         // rather than swallowed, since a silent generic message left no way to tell what to fix.
         positionError = e.toString().replaceFirst('Exception: ', '');
       }
+      // AI image analysis (Post-MVP backlog) — a real, local quality check right after the shot,
+      // so a blurry/dark/overexposed photo can be caught here rather than only found out later
+      // when a supervisor reviews it. Best-effort: a decode failure just means no warning shows,
+      // never blocks confirming the photo.
+      List<String> qualityFlags = [];
+      try {
+        final bytes = await file.readAsBytes();
+        qualityFlags = analyzeOnDeviceImageQuality(bytes).flags;
+      } catch (_) {
+        // leave empty
+      }
       if (!mounted) return;
       setState(() {
         _capturedFile = file;
         _capturedPosition = position;
         _positionError = positionError;
         _capturedAt = DateTime.now();
+        _qualityFlags = qualityFlags;
       });
     } catch (e) {
       if (mounted) {
@@ -101,6 +122,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
       _capturedPosition = null;
       _positionError = null;
       _capturedAt = null;
+      _qualityFlags = [];
     });
   }
 
@@ -169,6 +191,30 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
         body: Column(
           children: [
             Expanded(child: Image.file(File(_capturedFile!.path))),
+            if (_qualityFlags.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade300),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t.qualityWarningMessage(_qualityFlags.map((f) => _qualityFlagLabel(t, f)).join(', ')),
+                        style: TextStyle(color: Colors.amber.shade900),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
@@ -193,7 +239,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
                   ElevatedButton.icon(
                     onPressed: _saving ? null : _confirm,
                     icon: const Icon(Icons.check),
-                    label: Text(_saving ? t.savingPhoto : t.useThisPhoto),
+                    label: Text(_saving ? t.savingPhoto : (_qualityFlags.isNotEmpty ? t.useAnyway : t.useThisPhoto)),
                   ),
                 ],
               ),

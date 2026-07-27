@@ -55,6 +55,12 @@ dependencies:
   # https://maps.google.com/?q=lat,lng pattern the web Live Map page already uses for supervisors.
   url_launcher: ^6.3.1
 
+  # AI image analysis (Post-MVP backlog): real on-device photo-quality checks (blur, exposure) —
+  # a pure-Dart decode/greyscale/convolution, no ML model, mirroring the same technique the
+  # backend already uses server-side (core/media-ai/image-quality.ts). Was already a transitive
+  # dependency (pulled in by other packages); pinned directly since this app now imports it too.
+  image: ^4.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

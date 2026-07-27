@@ -557,6 +557,23 @@ class AppLocalizationsHi extends AppLocalizations {
       'गूगल मैप्स नहीं खुल सका — जांचें कि आपके पास सिग्नल और एक मैप्स ऐप है।';
 
   @override
+  String get qualityFlagBlurry => 'धुंधली';
+
+  @override
+  String get qualityFlagTooDark => 'बहुत गहरी (डार्क)';
+
+  @override
+  String get qualityFlagTooBright => 'बहुत तेज़ रोशनी वाली';
+
+  @override
+  String qualityWarningMessage(Object issues) {
+    return 'यह फ़ोटो $issues हो सकती है — आप इसे फिर से ले सकते हैं या ऐसे ही इस्तेमाल कर सकते हैं।';
+  }
+
+  @override
+  String get useAnyway => 'ऐसे ही इस्तेमाल करें';
+
+  @override
   String get languageSettingTitle => 'Language / भाषा';
 
   @override

@@ -1026,6 +1026,36 @@ abstract class AppLocalizations {
   /// **'Could not open Google Maps — check you have signal and a maps app installed.'**
   String get couldNotOpenGoogleMaps;
 
+  /// No description provided for @qualityFlagBlurry.
+  ///
+  /// In en, this message translates to:
+  /// **'blurry'**
+  String get qualityFlagBlurry;
+
+  /// No description provided for @qualityFlagTooDark.
+  ///
+  /// In en, this message translates to:
+  /// **'too dark'**
+  String get qualityFlagTooDark;
+
+  /// No description provided for @qualityFlagTooBright.
+  ///
+  /// In en, this message translates to:
+  /// **'overexposed'**
+  String get qualityFlagTooBright;
+
+  /// No description provided for @qualityWarningMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo may be {issues} — you can retake it or use it anyway.'**
+  String qualityWarningMessage(Object issues);
+
+  /// No description provided for @useAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Use anyway'**
+  String get useAnyway;
+
   /// No description provided for @languageSettingTitle.
   ///
   /// In en, this message translates to:

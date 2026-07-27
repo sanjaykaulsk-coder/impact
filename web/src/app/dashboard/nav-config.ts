@@ -32,6 +32,7 @@ export const NAV_LIVE_ITEMS: LiveNavItem[] = [
   { label: 'Client Dashboard', requiredPermission: 'view', href: '/dashboard/client-dashboard' },
   { label: 'Live Map', requiredPermission: 'approve', href: '/dashboard/live-map' },
   { label: 'Device Risk', requiredPermission: 'block', href: '/dashboard/device-risk' },
+  { label: 'Media Review', requiredPermission: 'approve', href: '/dashboard/media-review' },
   { label: 'Reports', requiredPermission: 'view_reports', href: '/dashboard/reports' },
   { label: 'Readiness', requiredPermission: 'view_reports', href: '/dashboard/readiness' },
 ];

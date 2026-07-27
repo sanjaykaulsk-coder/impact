@@ -320,6 +320,17 @@
   "couldNotOpenGoogleMaps": "Could not open Google Maps — check you have signal and a maps app installed.",
   "@couldNotOpenGoogleMaps": {},
 
+  "qualityFlagBlurry": "blurry",
+  "@qualityFlagBlurry": {},
+  "qualityFlagTooDark": "too dark",
+  "@qualityFlagTooDark": {},
+  "qualityFlagTooBright": "overexposed",
+  "@qualityFlagTooBright": {},
+  "qualityWarningMessage": "This photo may be {issues} — you can retake it or use it anyway.",
+  "@qualityWarningMessage": { "placeholders": { "issues": {} } },
+  "useAnyway": "Use anyway",
+  "@useAnyway": {},
+
   "languageSettingTitle": "Language / भाषा",
   "@languageSettingTitle": {},
   "languageEnglish": "English",

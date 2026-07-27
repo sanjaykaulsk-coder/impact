@@ -45,7 +45,7 @@ const reportsService = new ReportsService(prismaService, new TeamDashboardServic
 // ExecutionService's storage, audit, and device-risk dependencies are only used by the
 // media/GPS/deviation endpoints, which this suite never touches — submitMilestoneResponse (the
 // path under test) needs none of them.
-const executionService = new ExecutionService(prismaService, undefined as never, undefined as never, undefined as never);
+const executionService = new ExecutionService(prismaService, undefined as never, undefined as never, undefined as never, undefined as never);
 
 const RUN_TAG = `acc-${Date.now().toString(36)}`;
 

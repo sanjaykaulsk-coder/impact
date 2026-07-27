@@ -52,6 +52,7 @@ import type {
   ReopenExceptionRequest,
   RequestOtpResponse,
   ReschedulePjpRowRequest,
+  MediaReviewItem,
   ResolveAlertRequest,
   ResolveExceptionRequest,
   RoleSummary,
@@ -449,6 +450,8 @@ export const api = {
       request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/clear`, { method: 'POST' }),
     blockDevice: (campaignId: string, deviceId: string) =>
       request(`/campaigns/${campaignId}/supervisor/device-risk/${deviceId}/block`, { method: 'POST' }),
+    mediaReview: (campaignId: string, flaggedOnly: boolean) =>
+      request<MediaReviewItem[]>(`/campaigns/${campaignId}/supervisor/media-review?flaggedOnly=${flaggedOnly}`),
   },
   teamDashboard: {
     attendance: (campaignId: string, date?: string) =>

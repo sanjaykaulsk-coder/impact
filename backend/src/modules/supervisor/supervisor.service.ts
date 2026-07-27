@@ -379,4 +379,54 @@ export class SupervisorService {
         : [],
     };
   }
+
+  /**
+   * AI image analysis (Post-MVP backlog, spec §42/§25's "Media review" screen — listed as a
+   * required supervisor screen that never got built until now). Most-recent-200 bound, same
+   * reasoning as the perceptual-duplicate scan in ExecutionService — keeps this fast without
+   * needing pagination for this session's scope.
+   */
+  async mediaReview(tenant: TenantContext, flaggedOnly: boolean) {
+    return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
+      const media = await tx.media.findMany({
+        where: {
+          campaignId: tenant.campaignId,
+          mimeType: { startsWith: 'image/' },
+          ...(flaggedOnly ? { qualityFlags: { isEmpty: false } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+      if (media.length === 0) return [];
+
+      const activityIds = [...new Set(media.map((m) => m.activityInstanceId).filter((id): id is string => !!id))];
+      const [users, activities] = await Promise.all([
+        tx.user.findMany({
+          where: { id: { in: [...new Set(media.map((m) => m.uploadedByUserId))] } },
+          select: { id: true, fullName: true },
+        }),
+        tx.activityInstance.findMany({ where: { id: { in: activityIds } }, include: { pjpRow: true } }),
+      ]);
+      const nameById = new Map(users.map((u) => [u.id, u.fullName]));
+      const activityById = new Map(activities.map((a) => [a.id, a]));
+
+      return Promise.all(
+        media.map(async (m) => {
+          const activity = m.activityInstanceId ? activityById.get(m.activityInstanceId) : undefined;
+          return {
+            mediaId: m.id,
+            url: await this.media.getSignedGetUrl(m.objectKeyWatermarked ?? m.objectKeyOriginal),
+            uploadedByName: nameById.get(m.uploadedByUserId) ?? 'Unknown',
+            locationName: activity?.pjpRow?.locationName ?? 'Field location',
+            capturedAt: m.capturedAt,
+            approvalStatus: m.approvalStatus,
+            qualityFlags: m.qualityFlags,
+            qualityBlurVariance: m.qualityBlurVariance,
+            qualityBrightnessMean: m.qualityBrightnessMean,
+            contentClassification: m.contentClassificationJson,
+          };
+        }),
+      );
+    });
+  }
 }

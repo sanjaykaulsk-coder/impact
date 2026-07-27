@@ -117,4 +117,13 @@ export class SupervisorController {
   ) {
     return this.supervisor.blockDevice(tenant, deviceId, user.id);
   }
+
+  @Get('media-review')
+  mediaReview(
+    @Param('campaignId') _campaignId: string,
+    @Query('flaggedOnly') flaggedOnly: string | undefined,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return this.supervisor.mediaReview(tenant, flaggedOnly === 'true');
+  }
 }

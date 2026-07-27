@@ -166,6 +166,12 @@
   "openInGoogleMaps": "गूगल मैप्स में खोलें",
   "couldNotOpenGoogleMaps": "गूगल मैप्स नहीं खुल सका — जांचें कि आपके पास सिग्नल और एक मैप्स ऐप है।",
 
+  "qualityFlagBlurry": "धुंधली",
+  "qualityFlagTooDark": "बहुत गहरी (डार्क)",
+  "qualityFlagTooBright": "बहुत तेज़ रोशनी वाली",
+  "qualityWarningMessage": "यह फ़ोटो {issues} हो सकती है — आप इसे फिर से ले सकते हैं या ऐसे ही इस्तेमाल कर सकते हैं।",
+  "useAnyway": "ऐसे ही इस्तेमाल करें",
+
   "languageSettingTitle": "Language / भाषा",
   "languageEnglish": "English",
   "languageHindi": "हिन्दी"

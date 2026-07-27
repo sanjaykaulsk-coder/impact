@@ -634,6 +634,20 @@ export interface DeviceRiskAlert {
   createdAt: string;
 }
 
+// -- AI image analysis (Post-MVP backlog, spec §42) -----------------------------------------------
+export interface MediaReviewItem {
+  mediaId: string;
+  url: string;
+  uploadedByName: string;
+  locationName: string;
+  capturedAt: string | null;
+  approvalStatus: string;
+  qualityFlags: string[];
+  qualityBlurVariance: number | null;
+  qualityBrightnessMean: number | null;
+  contentClassification: { mock: boolean; label: string; confidence: number; note: string } | null;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stage 3.1 — Campaign SKU Master + reports (report-format-library §§1-3)
 // ---------------------------------------------------------------------------------------------
