@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { AuditService } from '../../core/audit/audit.service';
 import { postgisDistanceMeters } from '../../core/geo/postgis-distance';
 import { MediaStorageService } from '../../core/storage/media-storage.service';
+import { computePerceptualHash, hammingDistance, PERCEPTUAL_DUPLICATE_THRESHOLD } from '../../core/storage/perceptual-hash';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { DeviceRiskService } from '../device-risk/device-risk.service';
@@ -391,15 +392,27 @@ export class ExecutionService {
     });
     await this.media.discardChunks(session.id);
 
+    // Perceptual duplicate detection (spec §17/§18) — best-effort: a hash failure (e.g. an
+    // unexpected image format sharp can't decode) never blocks a real upload, it just means this
+    // one photo doesn't get compared against past ones.
+    let perceptualHash: string | null = null;
+    if (session.mimeType.startsWith('image/')) {
+      try {
+        perceptualHash = await computePerceptualHash(assembled);
+      } catch {
+        // leave null
+      }
+    }
+
     return this.prisma.runInTenantContext(tenant.clientId, async (tx) => {
       // Duplicate-photo detection (spec §17): the exact same bytes already uploaded for this
       // activity is returned as-is rather than stored (and billed for storage) twice.
       const existing = await tx.media.findFirst({
         where: { activityInstanceId: session.activityInstanceId, sha256Hash: stored.sha256Hash },
       });
-      const mediaRow =
-        existing ??
-        (await tx.media.create({
+      let mediaRow = existing;
+      if (!mediaRow) {
+        mediaRow = await tx.media.create({
           data: {
             clientId: tenant.clientId,
             campaignId: tenant.campaignId,
@@ -411,6 +424,7 @@ export class ExecutionService {
             mimeType: session.mimeType,
             sizeBytes: stored.sizeBytes,
             sha256Hash: stored.sha256Hash,
+            perceptualHash,
             latitude: session.latitude,
             longitude: session.longitude,
             capturedAt: session.capturedAt,
@@ -419,7 +433,37 @@ export class ExecutionService {
             approvalStatus: 'PENDING',
             uploadStatus: 'SYNCED',
           },
-        }));
+        });
+
+        // Perceptual near-duplicate check — same uploader, same campaign, most recent 200 photos
+        // (bounded so this stays fast as a campaign's media grows; catches the realistic "reused an
+        // old photo for a new visit" case spec §18 names as a risk signal, "old photograph").
+        if (perceptualHash && session.deviceId) {
+          const candidates = await tx.media.findMany({
+            where: {
+              campaignId: tenant.campaignId,
+              uploadedByUserId: session.uploadedByUserId,
+              id: { not: mediaRow.id },
+              perceptualHash: { not: null },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+            select: { id: true, perceptualHash: true, activityInstanceId: true, createdAt: true },
+          });
+          const match = candidates.find(
+            (c) => c.perceptualHash && hammingDistance(perceptualHash!, c.perceptualHash) <= PERCEPTUAL_DUPLICATE_THRESHOLD,
+          );
+          if (match) {
+            await this.deviceRisk.recordSignal(tx, tenant, session.deviceId, 'DUPLICATE_MEDIA_SUSPECTED', {
+              newMediaId: mediaRow.id,
+              matchedMediaId: match.id,
+              matchedActivityInstanceId: match.activityInstanceId,
+              matchedCapturedAt: match.createdAt,
+              hammingDistance: hammingDistance(perceptualHash, match.perceptualHash!),
+            });
+          }
+        }
+      }
 
       await tx.mediaUploadSession.update({
         where: { id: session.id },

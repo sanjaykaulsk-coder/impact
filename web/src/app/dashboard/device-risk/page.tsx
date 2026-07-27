@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 const SIGNAL_LABELS: Record<string, string> = {
   DEVICE_TIME_MISMATCH: "Device clock doesn't match server time",
   MOCK_LOCATION_SUSPECTED: 'Mock/manipulated location suspected',
+  DUPLICATE_MEDIA_SUSPECTED: 'Photo looks like a re-used/old photograph',
 };
 
 // Spec §18: "personally owned phones; absolute prevention is impossible — implement risk

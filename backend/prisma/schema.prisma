@@ -1410,6 +1410,11 @@ model Media {
   mimeType                String
   sizeBytes               Int
   sha256Hash              String
+  // Perceptual duplicate detection (spec §17/§18, docs/architecture/08 §5: "exact-hash duplicates
+  // in MVP; perceptual similarity post-MVP") — a 64-bit difference-hash (dHash), nullable because
+  // media rows created before this feature have none. sha256Hash alone only catches byte-identical
+  // re-uploads; this catches a re-compressed, cropped, or re-photographed copy of the same scene.
+  perceptualHash          String?
   latitude                Decimal?                @db.Decimal(9, 6)
   longitude               Decimal?                @db.Decimal(9, 6)
   capturedAt              DateTime?
