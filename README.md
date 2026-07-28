@@ -4,12 +4,13 @@ Configurable, multi-client field-execution operating system for Impact Communica
 One common Android field app + web admin/monitoring portal. Campaigns are configuration, not code.
 
 **Start here:**
-1. `CLAUDE.md` — standing rules for every working session
-2. `docs/FIELD_COMMAND_SPEC.md` — complete product specification (source of truth)
-3. `docs/architecture/` — approved architecture pack (02, 05, 07, 08; see note below)
-4. `docs/STATE.md` — current build state · `docs/ASSUMPTIONS.md` — running assumptions log
+1. **`HANDOVER.md`** — briefing for a new team picking this up: how it works, how to set it up, what to watch out for
+2. `CLAUDE.md` — standing rules for every working session
+3. `docs/FIELD_COMMAND_SPEC.md` — complete product specification (source of truth)
+4. `docs/architecture/` — approved architecture pack (02, 05, 07, 08; see note below)
+5. `docs/STATE.md` — current build state · `docs/ASSUMPTIONS.md` — running assumptions log
 
-**Status:** Phase A (architecture) approved. Phase C (working foundation) built — see `docs/STATE.md`.
+**Status:** Full MVP scope built, plus all six Post-MVP backlog items — all confirmed working. See `HANDOVER.md` and `docs/STATE.md`.
 
 > Architecture docs 01, 03, 04, 06, 09 were referenced in Phase A's STATE.md as existing but were not
 > available to the Phase C session. Phase C was built directly from `docs/FIELD_COMMAND_SPEC.md`
