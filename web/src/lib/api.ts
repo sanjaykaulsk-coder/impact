@@ -35,9 +35,11 @@ import type {
   DrillDownResponse,
   ExceptionRecord,
   ExceptionStatus,
+  GeocodeResult,
   LiveMapPoint,
   FormTemplateDetail,
   FormTemplateSummary,
+  KnownPjpLocation,
   MeResponse,
   MyAccessResponse,
   MyCampaignSummary,
@@ -411,6 +413,16 @@ export const api = {
       request<PjpRowResponse>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/reassign`, { method: 'POST', body: JSON.stringify(dto) }),
     rowHistory: (campaignId: string, pjpId: string, rowId: string) =>
       request<PjpRowHistoryEntry[]>(`/campaigns/${campaignId}/pjps/${pjpId}/rows/${rowId}/history`),
+    knownLocations: (campaignId: string) =>
+      request<KnownPjpLocation[]>(`/campaigns/${campaignId}/pjps/known-locations`),
+    geocode: (campaignId: string, parts: { locationName?: string; tehsilName?: string; districtName?: string; stateName?: string }) => {
+      const params = new URLSearchParams();
+      if (parts.locationName) params.set('locationName', parts.locationName);
+      if (parts.tehsilName) params.set('tehsilName', parts.tehsilName);
+      if (parts.districtName) params.set('districtName', parts.districtName);
+      if (parts.stateName) params.set('stateName', parts.stateName);
+      return request<GeocodeResult | null>(`/campaigns/${campaignId}/pjps/geocode?${params.toString()}`);
+    },
   },
   assignments: {
     list: (campaignId: string) => request<AssignmentSummary[]>(`/campaigns/${campaignId}/assignments`),

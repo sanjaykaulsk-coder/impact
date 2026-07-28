@@ -3,9 +3,12 @@
 import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { parseCsv } from '@/lib/csv';
+import { districtsForState } from '@/lib/india-districts';
+import { INDIA_STATES_AND_UNION_TERRITORIES } from '@/lib/india-states';
 import type {
   AvailableAssignmentUser,
   CreatePjpResponse,
+  KnownPjpLocation,
   MyAccessResponse,
   PjpDetail,
   PjpRowHistoryEntry,
@@ -13,7 +16,12 @@ import type {
   PjpRowResponse,
   PjpSummary,
 } from '@impact/shared';
+import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
+
+// Leaflet touches `window`/DOM APIs at import time, which breaks Next.js's server-side render —
+// this must only ever load in the browser.
+const LocationPickerMap = dynamic(() => import('@/components/location-picker-map'), { ssr: false });
 
 type RowAction = 'edit' | 'cancel' | 'postpone' | 'reschedule' | 'reassign' | 'history';
 
@@ -101,6 +109,10 @@ export default function PjpPage() {
   const [manualForm, setManualForm] = useState<PjpRowInput>({});
   const [manualSaving, setManualSaving] = useState(false);
   const [manualSuccess, setManualSuccess] = useState<string | null>(null);
+  const [knownLocations, setKnownLocations] = useState<KnownPjpLocation[]>([]);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeNote, setGeocodeNote] = useState<string | null>(null);
+  const [mapViewCenter, setMapViewCenter] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
 
   const canManage = access?.permissions.includes('manage_pjp') ?? false;
   const activeCampaign = campaigns.find((c) => c.campaignId === selectedCampaignId);
@@ -126,6 +138,23 @@ export default function PjpPage() {
       if (!cancelled) setAccess(res);
     }).catch(() => {
       if (!cancelled) setAccess(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCampaignId]);
+
+  // State/District/Tehsil/Location suggestions (founder request) — every combination already used
+  // somewhere in this campaign's PJP rows, loaded once so typing a familiar location can auto-fill
+  // the rest instead of retyping it.
+  useEffect(() => {
+    if (!selectedCampaignId) return;
+    setKnownLocations([]);
+    let cancelled = false;
+    api.pjp.knownLocations(selectedCampaignId).then((res) => {
+      if (!cancelled) setKnownLocations(res);
+    }).catch(() => {
+      if (!cancelled) setKnownLocations([]);
     });
     return () => {
       cancelled = true;
@@ -198,6 +227,112 @@ export default function PjpPage() {
     }
   };
 
+  const distinctValues = (values: (string | undefined)[]): string[] => [
+    ...new Set(values.filter((v): v is string => !!v && v.trim().length > 0)),
+  ];
+  // The full list of Indian states/UTs is always offered (founder request: typing "U" should
+  // suggest "Uttar Pradesh" even in a brand-new campaign with no history yet), plus anything
+  // already used here that isn't already in that canonical list (e.g. a locally-used short form).
+  const stateOptions = distinctValues([...INDIA_STATES_AND_UNION_TERRITORIES, ...knownLocations.map((l) => l.stateName)]).sort();
+  // Real district data for the typed state (founder request), plus anything already used here
+  // that isn't in that dataset (e.g. a locally-known name). No canonical Tehsil dataset exists
+  // (see india-districts.ts) so Tehsil stays history-only, filtered by the typed district.
+  const districtOptions = distinctValues([
+    ...districtsForState(manualForm.stateName),
+    ...knownLocations
+      .filter((l) => !manualForm.stateName || l.stateName.toLowerCase() === manualForm.stateName.toLowerCase())
+      .map((l) => l.districtName),
+  ]).sort();
+  const tehsilOptions = distinctValues(
+    knownLocations
+      .filter((l) => !manualForm.districtName || l.districtName.toLowerCase() === manualForm.districtName.toLowerCase())
+      .map((l) => l.tehsilName),
+  );
+  const locationOptions = distinctValues(knownLocations.map((l) => l.locationName));
+
+  // Typing a location name that's already been used before fills in the rest of the row (and its
+  // last-known coordinates, if it had any) — never overwrites a field the admin has already typed.
+  // Returns whether a match was found, so the caller can decide whether a geocode lookup is
+  // still worth trying.
+  const applyKnownLocationIfMatched = (locationName: string): boolean => {
+    const match = knownLocations.find((l) => l.locationName.toLowerCase() === locationName.trim().toLowerCase());
+    if (!match) return false;
+    setManualForm((f) => ({
+      ...f,
+      stateName: f.stateName || match.stateName,
+      districtName: f.districtName || match.districtName,
+      tehsilName: f.tehsilName || match.tehsilName,
+      latitude: f.latitude ?? (match.latitude ? Number(match.latitude) : undefined),
+      longitude: f.longitude ?? (match.longitude ? Number(match.longitude) : undefined),
+    }));
+    return true;
+  };
+
+  // "Suggest lat/long" (founder request) — a real OpenStreetMap lookup for a location that's
+  // never been entered before, not a guess. The admin can always adjust the result before saving.
+  const findCoordinates = async (overrideLocationName?: string) => {
+    if (!selectedCampaignId) return;
+    setGeocoding(true);
+    setGeocodeNote(null);
+    try {
+      const result = await api.pjp.geocode(selectedCampaignId, {
+        locationName: overrideLocationName ?? manualForm.locationName,
+        tehsilName: manualForm.tehsilName,
+        districtName: manualForm.districtName,
+        stateName: manualForm.stateName,
+      });
+      if (result) {
+        setManualForm((f) => ({ ...f, latitude: result.latitude, longitude: result.longitude }));
+        setGeocodeNote(`Suggested from OpenStreetMap: ${result.displayName} — please check it's correct before saving.`);
+      } else {
+        setGeocodeNote('No match found for that address — please enter the coordinates manually, or pick the spot on the map below.');
+      }
+    } catch (err) {
+      setGeocodeNote(err instanceof ApiError ? err.message : 'Could not look up coordinates right now.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  // Founder request: "detect Lat/Long based on the data given" without an extra click, for the
+  // common case — leaving the Location field having typed a brand-new place (not one already
+  // known, and with no coordinates yet) tries a real geocode lookup automatically. A known match
+  // (handled above) always wins first, since it's exact rather than a best-guess address search.
+  const onLocationNameBlur = (locationName: string) => {
+    const matched = applyKnownLocationIfMatched(locationName);
+    if (!matched && locationName.trim() && manualForm.latitude === undefined && manualForm.longitude === undefined) {
+      findCoordinates(locationName.trim());
+    }
+  };
+
+  // Founder request: "when I select a state map should take me to that state and then as I keep
+  // on adding more details the map should get updated" — a real, progressively narrower geocode
+  // lookup as State/District/Tehsil are filled in, purely to move the map's view (never sets the
+  // actual saved Latitude/Longitude fields — only clicking the map, or the Location-level lookup
+  // above, does that). Never blocks the form and never shows an error banner — this is a nice-to-
+  // have "where roughly am I" cue, not a required step.
+  const navigateMapTo = async (parts: { stateName?: string; districtName?: string; tehsilName?: string }, zoom: number) => {
+    if (!selectedCampaignId) return;
+    if (manualForm.latitude !== undefined && manualForm.longitude !== undefined) return; // an exact pin already wins
+    try {
+      const result = await api.pjp.geocode(selectedCampaignId, parts);
+      if (result) setMapViewCenter({ lat: result.latitude, lng: result.longitude, zoom });
+    } catch {
+      // best-effort map navigation only — the form itself is unaffected either way
+    }
+  };
+  const onStateNameBlur = (stateName: string) => {
+    if (stateName.trim()) navigateMapTo({ stateName }, 7);
+  };
+  const onDistrictNameBlur = (districtName: string) => {
+    if (districtName.trim()) navigateMapTo({ districtName, stateName: manualForm.stateName }, 10);
+  };
+  const onTehsilNameBlur = (tehsilName: string) => {
+    if (tehsilName.trim()) {
+      navigateMapTo({ tehsilName, districtName: manualForm.districtName, stateName: manualForm.stateName }, 12);
+    }
+  };
+
   const submitManualLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCampaignId) return;
@@ -208,6 +343,8 @@ export default function PjpPage() {
       await api.pjp.addManualLocation(selectedCampaignId, manualForm);
       setManualSuccess(`Added "${manualForm.locationName}" — it's ready to assign right away.`);
       setManualForm({});
+      setGeocodeNote(null);
+      setMapViewCenter(null);
       loadPjps();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not add that location');
@@ -537,33 +674,61 @@ export default function PjpPage() {
                   <label>State *</label>
                   <input
                     required
+                    list="pjp-state-options"
                     value={manualForm.stateName ?? ''}
                     onChange={(e) => setManualForm((f) => ({ ...f, stateName: e.target.value }))}
+                    onBlur={(e) => onStateNameBlur(e.target.value)}
                   />
+                  <datalist id="pjp-state-options">
+                    {stateOptions.map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="field">
                   <label>District *</label>
                   <input
                     required
+                    list="pjp-district-options"
                     value={manualForm.districtName ?? ''}
                     onChange={(e) => setManualForm((f) => ({ ...f, districtName: e.target.value }))}
+                    onBlur={(e) => onDistrictNameBlur(e.target.value)}
                   />
+                  <datalist id="pjp-district-options">
+                    {districtOptions.map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="field">
                   <label>Tehsil *</label>
                   <input
                     required
+                    list="pjp-tehsil-options"
                     value={manualForm.tehsilName ?? ''}
+                    onBlur={(e) => onTehsilNameBlur(e.target.value)}
                     onChange={(e) => setManualForm((f) => ({ ...f, tehsilName: e.target.value }))}
                   />
+                  <datalist id="pjp-tehsil-options">
+                    {tehsilOptions.map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="field">
                   <label>Location / outlet *</label>
                   <input
                     required
+                    list="pjp-location-options"
                     value={manualForm.locationName ?? ''}
                     onChange={(e) => setManualForm((f) => ({ ...f, locationName: e.target.value }))}
+                    onBlur={(e) => onLocationNameBlur(e.target.value)}
                   />
+                  <datalist id="pjp-location-options">
+                    {locationOptions.map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="field">
                   <label>Latitude (optional)</label>
@@ -584,6 +749,17 @@ export default function PjpPage() {
                   />
                 </div>
                 <div className="field">
+                  <label>&nbsp;</label>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={geocoding || !manualForm.locationName}
+                    onClick={() => findCoordinates()}
+                  >
+                    {geocoding ? 'Looking up…' : 'Suggest lat/long'}
+                  </button>
+                </div>
+                <div className="field">
                   <label>Contact person (optional)</label>
                   <input
                     value={manualForm.contactPerson ?? ''}
@@ -597,6 +773,24 @@ export default function PjpPage() {
                     onChange={(e) => setManualForm((f) => ({ ...f, remarks: e.target.value }))}
                   />
                 </div>
+              </div>
+              {geocodeNote && (
+                <p className="subtitle" style={{ marginTop: 8, fontSize: 13 }}>{geocodeNote}</p>
+              )}
+              <div style={{ marginTop: 12 }}>
+                <p className="subtitle" style={{ fontSize: 13, marginBottom: 6 }}>
+                  The map follows along as you fill in State/District/Tehsil — click anywhere on
+                  it to set the exact spot.
+                </p>
+                <LocationPickerMap
+                  latitude={manualForm.latitude}
+                  longitude={manualForm.longitude}
+                  viewCenter={mapViewCenter}
+                  onPick={(lat, lng) => {
+                    setManualForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+                    setGeocodeNote(null);
+                  }}
+                />
               </div>
               <div className="panel-actions">
                 <button className="btn-primary inline" type="submit" disabled={manualSaving}>

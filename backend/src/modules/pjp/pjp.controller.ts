@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -44,6 +44,28 @@ export class PjpController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.pjp.addManualLocation(tenant, dto, user.id);
+  }
+
+  /** State/District/Tehsil/Location autocomplete + coordinate auto-fill (founder request) — every
+   * distinct combination already used in this campaign's PJP rows. */
+  @RequirePermissions('view')
+  @Get('known-locations')
+  knownLocations(@Param('campaignId') _campaignId: string, @CurrentTenant() tenant: TenantContext) {
+    return this.pjp.knownLocations(tenant);
+  }
+
+  /** "Suggest lat/long" (founder request) — a real OpenStreetMap geocode lookup for a location
+   * that's never been entered before. */
+  @RequirePermissions('view')
+  @Get('geocode')
+  geocode(
+    @Param('campaignId') _campaignId: string,
+    @Query('locationName') locationName: string | undefined,
+    @Query('tehsilName') tehsilName: string | undefined,
+    @Query('districtName') districtName: string | undefined,
+    @Query('stateName') stateName: string | undefined,
+  ) {
+    return this.pjp.geocode({ locationName, tehsilName, districtName, stateName });
   }
 
   @RequirePermissions('view')

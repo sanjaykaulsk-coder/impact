@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../../core/audit/audit.service';
+import { GeocodingService } from '../../core/geo/geocoding.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CreatePjpDto, PjpRowInputDto } from './dto/create-pjp.dto';
@@ -22,6 +23,7 @@ export class PjpService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly geocoding: GeocodingService,
   ) {}
 
   /**
@@ -51,6 +53,30 @@ export class PjpService {
     return this.prisma.runInTenantContext(tenant.clientId, (tx) =>
       tx.pJP.findMany({ where: { campaignId: tenant.campaignId }, orderBy: { createdAt: 'desc' } }),
     );
+  }
+
+  /**
+   * State/District/Tehsil/Location suggestions (founder request) — every distinct combination
+   * already used somewhere in this campaign's PJP rows, most recent first, so typing a location
+   * name that's been used before can auto-fill the rest (and its last-known coordinates) instead
+   * of retyping — and so slightly different spellings of the same place don't quietly pile up.
+   */
+  async knownLocations(tenant: TenantContext) {
+    return this.prisma.runInTenantContext(tenant.clientId, (tx) =>
+      tx.pJPRow.findMany({
+        where: { campaignId: tenant.campaignId },
+        distinct: ['stateName', 'districtName', 'tehsilName', 'locationName'],
+        orderBy: { date: 'desc' },
+        select: { stateName: true, districtName: true, tehsilName: true, locationName: true, latitude: true, longitude: true },
+        take: 500,
+      }),
+    );
+  }
+
+  /** "Suggest lat/long" (founder request) — a real OpenStreetMap geocode lookup, not a mock; see
+   * GeocodingService for why this is safe to call directly from a manually-clicked button. */
+  async geocode(parts: { locationName?: string; tehsilName?: string; districtName?: string; stateName?: string }) {
+    return this.geocoding.geocode(parts);
   }
 
   async findOne(tenant: TenantContext, pjpId: string) {

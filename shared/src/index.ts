@@ -451,6 +451,21 @@ export interface PjpRowInput {
   remarks?: string;
 }
 
+export interface KnownPjpLocation {
+  stateName: string;
+  districtName: string;
+  tehsilName: string;
+  locationName: string;
+  latitude: string | null;
+  longitude: string | null;
+}
+
+export interface GeocodeResult {
+  latitude: number;
+  longitude: number;
+  displayName: string;
+}
+
 export interface CreatePjpRequest {
   fileName: string;
   rows: PjpRowInput[];
