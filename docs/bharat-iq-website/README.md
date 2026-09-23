@@ -1,31 +1,40 @@
-# BHARAT IQ — WEBSITE PACK
+# BHARAT IQ — WEBSITE & PRODUCT PACK
 
-Marketing deliverable for **Bharat IQ, powered by Impact Communications**.
-Not part of the IMPACT FIELD COMMAND application build — these are content and design
-documents, not code.
+Marketing and product deliverables for **Bharat IQ, powered by Impact Communications**.
+Not part of the IMPACT FIELD COMMAND application build — these are content, design and
+planning documents, not code.
 
 | File | What it is | Who uses it |
 |---|---|---|
 | `00-SEO-STRATEGY.md` | Competitor audit, keyword architecture (8 clusters), site structure, technical SEO spec, content engine plan, 12-month targets, risks | SEO/digital lead, agency, developer |
-| `01-WEBSITE-CONTENT.md` | Full page-by-page copy with meta titles, descriptions, H1/H2 structure, FAQ blocks and CTAs — ~7,900 words, publish-ready | Content team, developer |
-| `02-STITCH-PROMPT.md` | Copy-paste prompts for Google Stitch: design system, navigation, 10 screen prompts, mobile variants, refinement prompts, handoff | Design lead |
+| `01-WEBSITE-CONTENT.md` | Full page-by-page copy with meta titles, descriptions, H1/H2 structure, FAQ blocks and CTAs — ~7,900 words | Content team, developer |
+| `02-STITCH-PROMPT.md` | Google Stitch prompts: design system, navigation, 10 screens, mobile, refinement, handoff — **plus §8, the anti-fabrication guardrail** | Design lead |
+| `03-CLAIMS-AUDIT.md` | **Review of the first Stitch output.** 61 invented figures, 11 legal exposures, 14 false-precision claims. Verdict: do not publish. Itemised fix list. | Founder, legal, content lead |
+| `04-PRODUCT-DEVELOPMENT-PLAN.md` | How to build the products the website wants to advertise: 11-product portfolio, 24-month sequencing, 3 decision gates, and the claim ladder tying releases to permitted copy | Founder, research lead, data lead |
 
-## Before anything goes live
+## Read in this order
 
-1. **Fill every `[FILL: X]`** in `01-WEBSITE-CONTENT.md` with Impact's real numbers
-   (districts, villages, retailers mapped, field executives, languages, states).
-   These are the site's strongest conversion assets. Do not invent them.
-2. **Verify every `[VERIFY]`** statistic against its primary source and note the date.
-   Third-party figures quoted here are directional and drawn from public reporting
-   as of September 2026.
-3. **Validate keyword volumes** in Ahrefs/Semrush for India before finalising the
-   keyword–URL map. The competition ratings in the strategy doc are directional.
-4. **Check the trademark position** on "Bharat IQ" and the name-collision risk with
-   the unrelated firm "Rural Impact Communications" — see `00-SEO-STRATEGY.md` §9.
+New to the pack → `00` → `01` → `02`.
+Reviewing the Stitch output → **`03` first.**
+Deciding what to build → **`04`.**
 
-## Suggested order of work
+## Hard rules established by the audit
 
-Week 1 — fill proof numbers, verify stats, lock domain
-Week 2 — run Stitch prompts, agree design direction
-Week 3–4 — build Phase 1 (18 pages), technical SEO implementation
-Week 5+ — sector pages, case studies, pillar content, Bharat IQ Index edition 1
+1. **No figure on the website without a real source.** The `[FILL: X]` tokens in `01` are
+   deliberately blank. Fill them with Impact's verified numbers, each with a written
+   definition beside it. Never let a generator fill them.
+2. **No certification, compliance badge or accreditation** until the certificate is held.
+3. **No client name or logo** without written permission on file.
+4. **No report with a download button** until the PDF exists.
+5. **COUNTED / MODELLED / ESTIMATED labels apply only to real data** — never to sample or
+   illustrative content.
+6. **No product name that is not shipped and supported.**
+
+The claim ladder in `04` §8 sets out exactly which sentence each product release unlocks.
+
+## Immediate next steps
+
+1. Work the close-out checklist in `03` — the "Stop" list first
+2. Answer the contract/IP question in `04` §3.2 — it blocks the entire publications plan
+3. Supply the real proof numbers (data inventory, `04` §10)
+4. Rerun Stitch with the §8 guardrail, then re-audit before any developer sees it

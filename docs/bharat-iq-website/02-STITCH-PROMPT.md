@@ -714,3 +714,72 @@ The design must serve the conversion and SEO logic, not the other way round.
 3. Give the developer this file plus `00-SEO-STRATEGY.md` §5 (technical spec), and `01-WEBSITE-CONTENT.md` for the copy.
 4. Build in Next.js with static generation — it matches the in-house stack, so the team can maintain the site without an external agency.
 5. Before launch, run the pre-launch check in `00-SEO-STRATEGY.md` §9, particularly the `[FILL]` and `[VERIFY]` sweeps. **Do not launch with a single unfilled proof number or an unverified statistic.** For a business whose product is evidence, that is the one unrecoverable mistake.
+
+---
+
+## 8. ANTI-FABRICATION GUARDRAIL (added 23 Sep 2026, after the first Stitch run)
+
+The first Stitch run filled all 41 `[FILL: X]` tokens with invented numbers, then generated a further layer of claims nobody asked for: ISO certifications, DPDP compliance badges, six client logos, three office addresses with working-format phone numbers, six non-existent reports and a fake live data feed. Full findings in `03-CLAIMS-AUDIT.md`.
+
+**The lesson:** a design generator handed a blank where a number belongs will always produce a number, because an empty stat block looks broken and a filled one looks finished. It has no concept of a claim it is not entitled to make. The `[FILL]` convention is a note to a human; to a generator it is a prompt.
+
+### PROMPT Z — paste this with EVERY screen prompt, before the screen brief
+
+```
+CRITICAL CONSTRAINT — READ BEFORE GENERATING ANYTHING.
+
+This is a real company's website. Every factual claim on it must be one the
+company can defend to a client, a regulator or a court. You do not know this
+company's real figures, so you must not produce any.
+
+NEVER INVENT, UNDER ANY CIRCUMSTANCES:
+- Numbers of villages, districts, states, outlets, retailers, staff, languages,
+  clients, studies, reports or years
+- Percentages, confidence intervals, margins of error, accuracy rates, r-squared
+  values, pass rates, SLAs or response times
+- Certifications, accreditations, standards compliance or audit status
+  (ISO, DPDP, or any other)
+- Client names, brand names or logos
+- Office addresses, phone numbers, email addresses or map locations
+- Report titles, page counts, file sizes, volume numbers, publication dates
+  or findings
+- Named people, proprietors, licence numbers, GPS coordinates or record IDs
+- Live feeds, timestamps, version numbers, "real-time" status indicators or
+  streaming data of any kind
+- Product or platform names that were not given to you in this prompt
+
+WHERE A NUMBER OR FACT IS MISSING:
+Render the slot visibly and obviously empty. Use a grey placeholder block with
+the literal text "[ FIGURE TO BE SUPPLIED ]" in the layout. Design the component
+so an empty slot still looks intentional — that is a layout problem to solve,
+not a reason to fill it.
+
+WHERE SAMPLE DATA IS NEEDED TO SHOW A TABLE OR RECORD STRUCTURE:
+Show the SCHEMA, not filled rows — field names and value types
+("Proprietor name — text", "Monthly turnover — ₹ band"). If a filled example is
+unavoidable, every row must carry the visible on-screen label
+"ILLUSTRATIVE — NOT A REAL RECORD" in text, not in a tooltip.
+
+THE PROVENANCE LABELS ARE SACRED:
+COUNTED, MODELLED and ESTIMATED may only ever appear on real data. Never apply
+them to sample, illustrative or generated content. Applying them to invented
+content destroys the one device this brand's credibility rests on.
+
+BANNED WORDS, regardless of context:
+guarantee, guaranteed, certified, accredited, compliant, audited, sovereign,
+telemetry, docket, radical, fellows, jurisdiction, #1, leading, India's largest,
+best-in-class.
+
+VOICE:
+Plain Indian business English at a Class-10 reading level. Short sentences.
+No consulting jargon. If a sentence would sound strange read aloud to a
+distributor in Barabanki, rewrite it.
+```
+
+### Operating rules from here
+
+1. **Never send a screen prompt with an unfilled `[FILL: X]`.** Either the real number goes in, or the prompt explicitly says to render a labelled empty slot.
+2. **Never put an unlabelled illustrative number in a prompt.** The first run's "400 appointed vs 160 serviced" — written as a concept illustration — came back as `N=24 Districts Audited`, a sourced finding. If a number is illustrative, the prompt must say so *and* the design must show it.
+3. **Run `03-CLAIMS-AUDIT.md` as a checklist against every new Stitch output** before it reaches a developer.
+4. **A final read by someone not involved in writing it.** Fabrications read as normal to whoever has been staring at the page.
+5. **Extract the text and read it separately from the design.** Fake claims are much easier to see as a plain list than inside a good-looking layout — which is exactly why they survived the first review.

@@ -1059,3 +1059,50 @@ statistics belong. Deliberately left blank rather than invented.
 
 ## Open issues / P0-P1
 - Unchanged from the previous session — none outstanding on Field Command.
+
+---
+
+# SESSION LOG — 23 Sep 2026 (cont.) · Bharat IQ claims audit + product plan
+
+**Still not a Field Command build session.** No application code touched.
+
+## Reviewed
+Founder uploaded `BHARAT_IQ_WEBSITE.zip` — 5 Stitch-generated pages (Request a Briefing,
+Reports, Rural Market Research, Route to Market, Rural Data Stack) plus a DESIGN.md — with
+the instruction: "I do not want to make any claim that we don't do."
+
+## Finding: NEEDS REVISION — none of the 5 pages can be published as-is
+Stitch filled all 41 `[FILL: X]` tokens with invented numbers, then generated a further layer
+of claims nobody asked for. Counted: 61 invented figures, 11 legal/regulatory exposures,
+14 false-precision claims, 6 internal contradictions. Only 4 claims on the site survive.
+
+Worst items: six named client logos (HUL, ITC, Godrej, Dabur, Mahindra Agri, "Marico Rural");
+ISO 20252 + ISO 27001 claims; DPDP compliance badges; three fabricated office addresses with
+dialable phone numbers; six non-existent downloadable reports; a fake "live field ingestion
+feed" with named villages and second-level timestamps tagged COUNTED; a named retailer with a
+fabricated government licence number and GPS coordinates. Also "42 States & UTs" (India has 36).
+
+## Built
+- `docs/bharat-iq-website/03-CLAIMS-AUDIT.md` — full itemised audit (evidence-validator FULL
+  pass), 9 sections, replacement copy, close-out checklist
+- `docs/bharat-iq-website/04-PRODUCT-DEVELOPMENT-PLAN.md` — 11-product portfolio, 24-month
+  sequencing, 3 decision gates, and a claim ladder mapping each release to the website
+  language it unlocks
+- `02-STITCH-PROMPT.md` §8 — anti-fabrication guardrail ("PROMPT Z") to paste with every
+  future screen prompt
+- `README.md` — rewritten with the six hard rules the audit established
+
+## Process note for this project
+The `[FILL: X]` convention is insufficient against a generator: handed a blank where a number
+belongs, it produces one. Going forward no generator sees a blank — either the real number
+goes in the prompt, or the prompt requires a visibly labelled empty slot.
+
+## Blocking question raised for the founder
+Do Impact's client contracts permit campaign-derived data to be aggregated into published or
+sold products? Unanswered, this blocks the entire Bharat IQ publications and subscriptions
+plan (`04` §3.2). Legal review recommended in month 1, before any other product work.
+
+## Open issues / P0-P1
+- Unchanged on Field Command — none outstanding.
+- Bharat IQ: website blocked pending (a) the audit close-out list, (b) real proof numbers,
+  (c) the contract/IP answer above.
