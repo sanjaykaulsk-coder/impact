@@ -8,11 +8,12 @@ planning documents, not code.
 |---|---|---|
 | `00-SEO-STRATEGY.md` | Competitor audit, keyword architecture (8 clusters), site structure, technical SEO spec, content engine plan, 12-month targets, risks | SEO/digital lead, agency, developer |
 | `01-WEBSITE-CONTENT.md` | Full page-by-page copy with meta titles, descriptions, H1/H2 structure, FAQ blocks and CTAs — ~7,900 words | Content team, developer |
-| `02-STITCH-PROMPT.md` | Google Stitch prompts: design system, navigation, 10 screens, mobile, refinement, handoff — **plus §8, the anti-fabrication guardrail** | Design lead |
+| `02-STITCH-PROMPT.md` | First-run Stitch prompts. **Screen prompts superseded by `07`; §8 (the anti-fabrication guardrail) is still mandatory and must be pasted with every prompt** | Design lead |
 | `03-CLAIMS-AUDIT.md` | **Review of the first Stitch output.** 61 invented figures, 11 legal exposures, 14 false-precision claims. Verdict: do not publish. Itemised fix list. | Founder, legal, content lead |
 | `04-PRODUCT-DEVELOPMENT-PLAN.md` | 11-product portfolio, 24-month sequencing, 3 decision gates, and the claim ladder tying releases to permitted copy. **Carries a status notice — partly superseded by the four-service brief; claim ladder and contract/IP question still valid** | Founder, research lead, data lead |
 | `05-SERVICE-STRUCTURE-AND-NUMBERS-REVIEW.md` | **Review of the four-service brief (Priority Engine / Campaign Intelligence / Cost Intelligence / Bharat Data) and verification status of the 13 headline figures.** Two externally implausible, two internally inconsistent. Includes the verification protocol | Founder, data lead, content lead |
 | `06-BRIEF-REVIEW-ABOUT-AND-SERVICES.md` | **Review of the two founder briefs read together.** One factual problem (district count / Census-2011 vintage in the problem statement), three consistency drifts between the pages, the naming call, the lead line, and what's missing | Founder, content lead |
+| `07-STITCH-PLAN-V2.md` | **The current Stitch plan.** Supersedes the screen prompts in `02`. Validated colour-encoding system, 7 screens, mobile, build order. Core idea: the site shows the product, not a brochure about it | Design lead, founder |
 | `NUMBERS-VERIFICATION-SHEET.csv` | One row per headline figure to be filled by whoever has platform access. No figure ships until its row is complete | Data lead |
 
 ## Read in this order
@@ -22,6 +23,7 @@ Reviewing the Stitch output → **`03` first.**
 Deciding what to build → **`04`** (read its status notice first).
 Confirming the headline numbers → **`05`**, then fill `NUMBERS-VERIFICATION-SHEET.csv`.
 Writing the site from the founder briefs → **`06`** — work its §10 list first.
+Running Stitch → **`07`**, with `02` §8 pasted alongside every prompt.
 
 ## Hard rules established by the audit
 

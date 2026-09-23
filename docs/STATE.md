@@ -1203,3 +1203,46 @@ would outperform the entire differentiator section).
 - Unchanged on Field Command — none outstanding.
 - Bharat IQ: `06` §10 action list open; verification sheet still unfilled; contract/IP question
   from `04` §3.2 still unanswered.
+
+---
+
+# SESSION LOG — 23 Sep 2026 (cont. 4) · Stitch plan v2
+
+**Not a Field Command build session.** No application code touched.
+
+## Built
+`docs/bharat-iq-website/07-STITCH-PLAN-V2.md` — replaces the screen prompts in `02` (the §8
+guardrail in `02` remains mandatory).
+
+**Core idea:** the first run produced a brochure about an intelligence practice, which is why
+it filled itself with invented credentials — a brochure has nothing to show. Bharat IQ is an
+engine, so the site should look like the engine. The homepage hero is a real piece of product
+output, including a visible NO DATA block that proves the "it says what it doesn't know" claim
+in one glance.
+
+## Colour encoding validated, not chosen by eye
+Ran the dataviz palette validator rather than picking colours by taste:
+- **First attempt (green-to-red tier scale) FAILED at CVD ΔE 3.8** — a red-green colourblind
+  reader could not distinguish "Enter Now" from "Avoid For Now". Worst possible failure for a
+  product whose job is telling clients where to spend.
+- **Four distinct hues cannot clear the separation floors in dark mode** — the band is too
+  narrow for two warm hues.
+- **Final: 3 chromatic tiers + neutral.** Enter Now #2a78d6 / Seed & Build #1baf7a / Watch
+  #eda100 / Avoid For Now neutral slate + 45° hatch. PASS all-pairs, both modes (worst CVD
+  ΔE 9.1 light / 8.4 dark vs target 8). Neutral for "Avoid For Now" is also semantically right
+  — it is the absence of a recommendation, not a warning.
+- **The three scores are deliberately NOT colour-coded** — same single hue, three separate
+  panels. Different colours would imply they are parts of one thing, which is exactly the
+  blending the methodology refuses. The design enforces the method.
+- **Confidence never uses colour** — form only (three dots + word + reason), because it is
+  orthogonal to tier.
+
+## Deliberately excluded from the prompts
+1,111 campaigns, 5,700 cost line items, 3.88 lakh touchpoints and all district counts — still
+unresolved in `NUMBERS-VERIFICATION-SHEET.csv` and `06` §1. Prompts carry only the safe
+figures (27 years, 38,000 of ~47,000 haats, 57,000 outlets, 25 states) and instruct Stitch to
+render anything else as a visible "[ TO BE SUPPLIED ]" — never a blank.
+
+## Open issues / P0-P1
+- Unchanged on Field Command — none outstanding.
+- Bharat IQ: `06` §10 action list; verification sheet unfilled; contract/IP question (`04` §3.2).
