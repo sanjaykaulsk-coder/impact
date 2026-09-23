@@ -1,3 +1,26 @@
+> ## ⚠ STATUS NOTICE — 23 Sep 2026, added after the four-service brief
+>
+> **This plan is materially out of date, in your favour.** It was written assuming Phase 0
+> — harvesting 27 years of records into a structured data asset — was still to be done over
+> months 1–3. The four-service brief shows it substantially **done**: a platform exists with
+> a village and Census reference spine, ~3.88 lakh mapped touchpoint entities, 38,424 haats
+> with market day, a retail and chemist layer, 1,111 documented campaigns and 5,700+ costed
+> line items across 25 states.
+>
+> That moves the plan forward by roughly 6–9 months and changes the sequencing: the question
+> is no longer *how do we build the asset* but *which layers are live in the product, and
+> what can we therefore claim*. See `05-SERVICE-STRUCTURE-AND-NUMBERS-REVIEW.md`.
+>
+> **Still valid and unchanged:** the claim ladder (§8), the contract/IP question (§3.2 — which
+> becomes *more* urgent now that a commercialisable asset demonstrably exists), the decision
+> gates, and the risk register.
+>
+> **Needs rewriting against the platform's real state:** §3 (Data Stack phases), §7
+> (sequencing), and the product verdicts in §2. I could not do that rewrite from this session
+> — the platform is not in this repository.
+
+---
+
 # BHARAT IQ — PRODUCT DEVELOPMENT PLAN
 **From claimed to real: sequencing the portfolio the website wants to advertise**
 Prepared: 23 September 2026 · Companion to `03-CLAIMS-AUDIT.md`

@@ -10,13 +10,16 @@ planning documents, not code.
 | `01-WEBSITE-CONTENT.md` | Full page-by-page copy with meta titles, descriptions, H1/H2 structure, FAQ blocks and CTAs — ~7,900 words | Content team, developer |
 | `02-STITCH-PROMPT.md` | Google Stitch prompts: design system, navigation, 10 screens, mobile, refinement, handoff — **plus §8, the anti-fabrication guardrail** | Design lead |
 | `03-CLAIMS-AUDIT.md` | **Review of the first Stitch output.** 61 invented figures, 11 legal exposures, 14 false-precision claims. Verdict: do not publish. Itemised fix list. | Founder, legal, content lead |
-| `04-PRODUCT-DEVELOPMENT-PLAN.md` | How to build the products the website wants to advertise: 11-product portfolio, 24-month sequencing, 3 decision gates, and the claim ladder tying releases to permitted copy | Founder, research lead, data lead |
+| `04-PRODUCT-DEVELOPMENT-PLAN.md` | 11-product portfolio, 24-month sequencing, 3 decision gates, and the claim ladder tying releases to permitted copy. **Carries a status notice — partly superseded by the four-service brief; claim ladder and contract/IP question still valid** | Founder, research lead, data lead |
+| `05-SERVICE-STRUCTURE-AND-NUMBERS-REVIEW.md` | **Review of the four-service brief (Priority Engine / Campaign Intelligence / Cost Intelligence / Bharat Data) and verification status of the 13 headline figures.** Two externally implausible, two internally inconsistent. Includes the verification protocol | Founder, data lead, content lead |
+| `NUMBERS-VERIFICATION-SHEET.csv` | One row per headline figure to be filled by whoever has platform access. No figure ships until its row is complete | Data lead |
 
 ## Read in this order
 
 New to the pack → `00` → `01` → `02`.
 Reviewing the Stitch output → **`03` first.**
-Deciding what to build → **`04`.**
+Deciding what to build → **`04`** (read its status notice first).
+Confirming the headline numbers → **`05`**, then fill `NUMBERS-VERIFICATION-SHEET.csv`.
 
 ## Hard rules established by the audit
 
@@ -29,12 +32,19 @@ Deciding what to build → **`04`.**
 5. **COUNTED / MODELLED / ESTIMATED labels apply only to real data** — never to sample or
    illustrative content.
 6. **No product name that is not shipped and supported.**
+7. **Demo parity** — if a figure is not live in the product a client can be shown, it does not
+   go on the website. It goes on the claim ladder with a target date.
+8. **Provenance on every figure** — REFERENCE (public data ingested) / COUNTED (our fieldwork) /
+   PROPRIETARY (our execution history) / MODELLED / ESTIMATED. Never mix them in one stat block.
 
 The claim ladder in `04` §8 sets out exactly which sentence each product release unlocks.
 
 ## Immediate next steps
 
-1. Work the close-out checklist in `03` — the "Stop" list first
-2. Answer the contract/IP question in `04` §3.2 — it blocks the entire publications plan
-3. Supply the real proof numbers (data inventory, `04` §10)
-4. Rerun Stitch with the §8 guardrail, then re-audit before any developer sees it
+1. Resolve the five definitional questions in `05` §7 — kirana/chemist provenance, the
+   touchpoint double-count, 19 vs 22 families, what a "record" is, and the founding year
+2. Fill `NUMBERS-VERIFICATION-SHEET.csv` — nothing publishes without it
+3. Work the close-out checklist in `03` — the "Stop" list first
+4. Answer the contract/IP question in `04` §3.2 — more urgent now that a commercialisable
+   asset demonstrably exists
+5. Rerun Stitch with the §8 guardrail and the verified numbers filled in, then re-audit

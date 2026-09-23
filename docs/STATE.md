@@ -1106,3 +1106,53 @@ plan (`04` §3.2). Legal review recommended in month 1, before any other product
 - Unchanged on Field Command — none outstanding.
 - Bharat IQ: website blocked pending (a) the audit close-out list, (b) real proof numbers,
   (c) the contract/IP answer above.
+
+---
+
+# SESSION LOG — 23 Sep 2026 (cont. 2) · Bharat IQ four-service brief + numbers verification
+
+**Still not a Field Command build session.** No application code touched.
+
+## Reviewed
+Founder supplied the Bharat IQ SERVICE STRUCTURE brief: four services (Priority Engine,
+Campaign Intelligence, Cost Intelligence, Bharat Data) plus 13 headline figures said to be
+real counts from the Bharat IQ platform, with the instruction to confirm each number before
+publication.
+
+## Could not confirm the counts — and said so
+The Bharat IQ platform and its datasets are NOT in this session. This repo is Field Command
+only; none of the 13 figures appear in the codebase or seed data. Confirming a count requires
+querying the table that produced it, which is not possible from here. Did instead: external
+plausibility checks against public benchmarks, internal consistency checks, and definitional
+risk review.
+
+## Findings
+- **Kirana (57,000+) vs chemists (84,000+) is inverted against the national ratio** (~15:1 the
+  other way). Almost certainly a real sourcing artefact — chemist licence registries are
+  public, kirana must be enumerated — but unexplained on a website it is the figure that makes
+  an FMCG buyer distrust the whole table. Highest-priority fix.
+- **5,97,483 villages is Census-derived reference data**, matching the inhabited-village range.
+  Correct as "reference universe" but must never sit beside owned-data counts.
+- **Possible double-count**: does 3,88,250 touchpoints include the 38,424 haats / 57,000 kirana
+  / 84,000 chemists (179,424)?
+- **19 families claimed, 22 listed** in the same brief.
+- **"5 million+ indexed records" has no defined unit.**
+- Plausible and strong: 38,424 haats (~82% of the ~47,000 national universe), 765 districts
+  (vs ~784–802 nationally), 5,700+ cost line items across 25 states.
+- Structural issue: the stat table mixes REFERENCE / COUNTED / PROPRIETARY data as one list,
+  which buries the uncopyable execution archive among public Census counts.
+
+## Built
+- `docs/bharat-iq-website/05-SERVICE-STRUCTURE-AND-NUMBERS-REVIEW.md` — full review, provenance
+  restructure, verification protocol, and a stated disagreement on commercial lead order
+  (lead visually with Bharat Data, commercially with Cost Intelligence)
+- `docs/bharat-iq-website/NUMBERS-VERIFICATION-SHEET.csv` — one row per figure to be completed
+  by whoever has platform access; nothing publishes without it
+- `04-PRODUCT-DEVELOPMENT-PLAN.md` — status notice added: Phase 0 harvest is substantially
+  done, plan moves forward 6–9 months, §3/§7/§2 need rewriting against the platform's real state
+- `README.md` — two new hard rules: demo parity, and provenance on every figure
+
+## Open issues / P0-P1
+- Unchanged on Field Command — none outstanding.
+- Bharat IQ: 5 definitional questions block the numbers (`05` §7); verification sheet unfilled;
+  contract/IP question from `04` §3.2 still unanswered and now more urgent.
