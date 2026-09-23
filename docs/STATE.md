@@ -1156,3 +1156,50 @@ risk review.
 - Unchanged on Field Command — none outstanding.
 - Bharat IQ: 5 definitional questions block the numbers (`05` §7); verification sheet unfilled;
   contract/IP question from `04` §3.2 still unanswered and now more urgent.
+
+---
+
+# SESSION LOG — 23 Sep 2026 (cont. 3) · Review of the two Bharat IQ founder briefs
+
+**Not a Field Command build session.** No application code touched.
+
+## Reviewed
+Two founder briefs read together: Page 1 "Service Structure" (four services + 13 figures) and
+Page 2 "About BIQ" (what it is / problem / what it does / differentiators / tone / lead lines).
+Read both source images directly to confirm full content.
+
+## Verdict: substantially improved, five fixes before it goes to a writer
+Numbers rounded down, weakest figures dropped, honesty promoted to lead differentiator, and
+the founder's own closing rule ("under-promise, let the demo over-deliver") is correct.
+
+**Factual problem:** the About page's opening problem statement uses 640 districts — the
+Census 2011 count. India has ~784-802 in 2026, and the Services page says 765. Three district
+figures now in circulation. The same paragraph's "6 lakh villages" and "6,500 blocks" are also
+Census-2011 vintage and unsourced — on a page whose central promise is "every number carries
+its source, its vintage and its confidence". The brief breaks its own rule in its own opening
+paragraph. One-line fix.
+
+**Haats double-meaning:** 38,000 appears as India's national total in the problem statement and
+as Bharat IQ's mapped count in Locate. National universe is ~47,000. As written it understates
+India and discards the best proof point. Recommended reframe: "38,000 of India's ~47,000 haats,
+with the market day for each" — 82% coverage, becomes the strongest sentence on the page.
+
+**Other fixes:** cost corpus drifted from "invoices and estimates" to "invoices"; two competing
+taxonomies (product names vs verbs) in two different orders; "an engine that reasons" is the one
+claim with no evidence attached and sits above a "no AI jargon" instruction; lead line and
+supporting line are the wrong way round; development-sector audience claimed with no module
+addressing it.
+
+**Missing from both:** a CTA (recommended: "See it run on your category" — a demo, not a
+briefing), and any proof of the honesty claim (one screenshot of a real low-confidence output
+would outperform the entire differentiator section).
+
+## Built
+- `docs/bharat-iq-website/06-BRIEF-REVIEW-ABOUT-AND-SERVICES.md` — full review, §10 action list
+- `NUMBERS-VERIFICATION-SHEET.csv` — district conflict recorded; blocks and cost-corpus rows added
+- `README.md` — routing updated
+
+## Open issues / P0-P1
+- Unchanged on Field Command — none outstanding.
+- Bharat IQ: `06` §10 action list open; verification sheet still unfilled; contract/IP question
+  from `04` §3.2 still unanswered.

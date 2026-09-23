@@ -12,6 +12,7 @@ planning documents, not code.
 | `03-CLAIMS-AUDIT.md` | **Review of the first Stitch output.** 61 invented figures, 11 legal exposures, 14 false-precision claims. Verdict: do not publish. Itemised fix list. | Founder, legal, content lead |
 | `04-PRODUCT-DEVELOPMENT-PLAN.md` | 11-product portfolio, 24-month sequencing, 3 decision gates, and the claim ladder tying releases to permitted copy. **Carries a status notice — partly superseded by the four-service brief; claim ladder and contract/IP question still valid** | Founder, research lead, data lead |
 | `05-SERVICE-STRUCTURE-AND-NUMBERS-REVIEW.md` | **Review of the four-service brief (Priority Engine / Campaign Intelligence / Cost Intelligence / Bharat Data) and verification status of the 13 headline figures.** Two externally implausible, two internally inconsistent. Includes the verification protocol | Founder, data lead, content lead |
+| `06-BRIEF-REVIEW-ABOUT-AND-SERVICES.md` | **Review of the two founder briefs read together.** One factual problem (district count / Census-2011 vintage in the problem statement), three consistency drifts between the pages, the naming call, the lead line, and what's missing | Founder, content lead |
 | `NUMBERS-VERIFICATION-SHEET.csv` | One row per headline figure to be filled by whoever has platform access. No figure ships until its row is complete | Data lead |
 
 ## Read in this order
@@ -20,6 +21,7 @@ New to the pack → `00` → `01` → `02`.
 Reviewing the Stitch output → **`03` first.**
 Deciding what to build → **`04`** (read its status notice first).
 Confirming the headline numbers → **`05`**, then fill `NUMBERS-VERIFICATION-SHEET.csv`.
+Writing the site from the founder briefs → **`06`** — work its §10 list first.
 
 ## Hard rules established by the audit
 
