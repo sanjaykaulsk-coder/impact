@@ -1023,3 +1023,39 @@ check-in first.
 
 ## Open issues / P0-P1
 - None outstanding — every issue found during this build was root-caused and fixed (see "Bugs found and fixed" above), not worked around.
+
+---
+
+# SESSION LOG — 23 Sep 2026 · Bharat IQ website pack (non-code deliverable)
+
+**Not a Field Command build session.** No application code touched; no architecture sections
+implemented; no phase gate moved. Added a marketing content deliverable under
+`docs/bharat-iq-website/` at the founder's request.
+
+## Built
+- `docs/bharat-iq-website/00-SEO-STRATEGY.md` — competitor audit (research incumbents, rural
+  activation agencies, rural data platforms), 8 keyword clusters, site architecture, technical
+  SEO + schema spec, 12-month content engine, measurement targets, risks
+- `docs/bharat-iq-website/01-WEBSITE-CONTENT.md` — ~7,900 words of publish-ready copy: homepage,
+  5 service pages, 7 solution pages, 8 sector briefs, Rural Data Stack, Reports, About, Contact,
+  Glossary, 3 blog pillars; every page with meta title, meta description, H1/H2 structure and
+  FAQ blocks for schema
+- `docs/bharat-iq-website/02-STITCH-PROMPT.md` — Google Stitch prompts: design system, global
+  navigation, 10 screen prompts, mobile variants, refinement prompts, handoff checklist
+- `docs/bharat-iq-website/README.md` — index and pre-launch checklist
+
+## QA grep
+Clean. The only `lorem ipsum` matches are instructions forbidding it. 41 `[FILL: X]` and
+9 `[VERIFY]` tokens are intentional, documented in the README, and must be resolved before
+the site goes live — they mark where Impact's real proof numbers and verified third-party
+statistics belong. Deliberately left blank rather than invented.
+
+## Next (for the founder / marketing team, not the build)
+1. Fill the 41 proof numbers (districts, villages, retailers mapped, field executives, languages)
+2. Verify the 9 third-party statistics against primary sources
+3. Validate keyword volumes in Ahrefs/Semrush for India
+4. Check the "Bharat IQ" trademark position and the name-collision risk with the unrelated firm
+   "Rural Impact Communications"
+
+## Open issues / P0-P1
+- Unchanged from the previous session — none outstanding on Field Command.
